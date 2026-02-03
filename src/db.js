@@ -1,28 +1,20 @@
-require('dotenv').config(); // 🔥 CARGA EL .env SÍ O SÍ
+require("dotenv").config();
+const { Pool } = require("pg");
 
-const { Pool } = require('pg');
-
-// 🔎 DEBUG (dejalo hasta que todo funcione)
-console.log('DB CONFIG =>', {
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  passwordType: typeof process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
-});
+// Mostrar solo que existe, sin revelar secretos
+console.log("DATABASE_URL existe:", !!process.env.DATABASE_URL);
 
 const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: String(process.env.DB_PASSWORD), // 🔥 fuerza string
-  port: Number(process.env.DB_PORT),          // 🔥 fuerza número
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
-// Test de conexión al iniciar
+// Test al iniciar
 pool
-  .query('SELECT 1')
-  .then(() => console.log('✅ PostgreSQL conectado correctamente'))
-  .catch(err => console.error('❌ Error conectando a PostgreSQL:', err));
+  .query("SELECT 1")
+  .then(() => console.log("✅ PostgreSQL conectado correctamente"))
+  .catch(err => console.error("❌ Error conectando a PostgreSQL:", err));
 
 module.exports = pool;
