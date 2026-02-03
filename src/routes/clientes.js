@@ -1,0 +1,17 @@
+const express = require('express');
+const router = express.Router();
+
+const {
+  getClientes,
+  createCliente,
+  buscarClientes
+} = require('../controllers/clientesController');
+
+// ⚠️ SEARCH SIEMPRE VA ANTES DE '/'
+router.get('/search', buscarClientes);
+
+router.get('/', getClientes);
+router.post('/', createCliente);
+
+module.exports = router;
+

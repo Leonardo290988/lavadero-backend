@@ -1,0 +1,340 @@
+const pool = require("../db");
+console.log("🔥 RETIROS CONTROLLER CARGADO 🔥");
+const generarTicketRetiro = require("../utils/generarTicketRetiro");
+const generarTicketProvisorio = require("../utils/generarTicketProvisorio");
+const { exec } = require("child_process");
+
+function calcularPrecioZona(zona){
+  if(zona == 1) return 5;
+  if(zona == 2) return 3000;
+  if(zona == 3) return 4000;
+  return 0;
+}
+
+// ===============================
+// SOLICITAR RETIRO (cliente)
+// ===============================
+const solicitarRetiro = async (req,res)=>{
+  try {
+
+    console.log("➡️ BODY:", req.body);
+
+    const { cliente_id, orden_id, zona, direccion, tipo } = req.body;
+
+    let precio = 0;
+    if(zona == 1) precio = 5;
+    if(zona == 2) precio = 3000;
+    if(zona == 3) precio = 4000;
+
+    const result = await pool.query(`
+      INSERT INTO retiros
+      (cliente_id, orden_id, zona, direccion, precio, estado, tipo)
+      VALUES ($1,$2,$3,$4,$5,'pendiente',$6)
+      RETURNING *
+    `,
+    [cliente_id, orden_id, zona, direccion, precio, tipo]);
+
+    console.log("✅ RETIRO CREADO:", result.rows[0]);
+
+    res.json(result.rows[0]);
+
+  } catch(err){
+    console.error("❌ ERROR solicitarRetiro:", err);
+    res.status(500).json({error:"Error solicitando retiro"});
+  }
+};
+
+//====================================
+//=====================================
+
+// ===============================
+// CREAR RETIRO PRE-PAGO (cliente)
+// ===============================
+const crearRetiroPrePago = async (req, res) => {
+  try {
+
+    const { cliente_id, zona, direccion, tipo } = req.body;
+
+    if (!cliente_id || !zona || !direccion || !tipo) {
+      return res.status(400).json({ error: "Faltan datos" });
+    }
+
+    // Calcular precio por zona
+    let precio = 0;
+    if (zona == 1) precio = 5;
+    if (zona == 2) precio = 3000;
+    if (zona == 3) precio = 4000;
+
+    const result = await pool.query(`
+      INSERT INTO retiros
+      (cliente_id, zona, direccion, precio, estado, tipo)
+      VALUES ($1,$2,$3,$4,'esperando_pago',$5)
+      RETURNING *
+    `, [cliente_id, zona, direccion, precio, tipo]);
+
+    res.json(result.rows[0]);
+
+  } catch (error) {
+    console.error("❌ crearRetiroPrePago:", error);
+    res.status(500).json({ error: "Error creando retiro" });
+  }
+};
+
+// ===============================
+// LISTAR PENDIENTES
+// ===============================
+const getRetirosPendientes = async (req,res)=>{
+  const r = await pool.query(`
+    SELECT 
+      r.id,
+      r.tipo,
+      r.zona,
+      r.direccion,
+      r.precio,
+      r.estado,
+      c.nombre as cliente,
+      o.id as orden_id
+    FROM retiros r
+    LEFT JOIN clientes c ON c.id = r.cliente_id
+    LEFT JOIN ordenes o ON o.id = r.orden_id
+    WHERE r.estado='pendiente'
+    ORDER BY r.creado_en ASC
+  `);
+
+  res.json(r.rows);
+};
+
+// ===============================
+// ACEPTAR RETIRO
+// ===============================
+const aceptarRetiro = async (req, res) => {
+  const { id } = req.params;
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // =========================
+    // TRAER RETIRO
+    // =========================
+    const retiroRes = await client.query(`
+      SELECT *
+      FROM retiros
+      WHERE id=$1
+    `,[id]);
+
+    if(retiroRes.rows.length === 0){
+      return res.status(404).json({error:"Retiro no encontrado"});
+    }
+
+    const retiro = retiroRes.rows[0];
+
+    if(retiro.estado !== "pendiente"){
+      return res.status(400).json({error:"Retiro ya procesado"});
+    }
+
+    // =========================
+    // CREAR ORDEN VACIA
+    // =========================
+    const ordenRes = await client.query(`
+      INSERT INTO ordenes
+      (cliente_id, estado, fecha_ingreso, tiene_envio)
+      VALUES ($1,'ingresado',NOW(),false)
+      RETURNING *
+    `,[retiro.cliente_id]);
+
+    const orden = ordenRes.rows[0];
+
+    let tieneEnvio = false;
+
+    // =========================
+    // VINCULAR RETIRO A ORDEN
+    // =========================
+    await client.query(`
+      UPDATE retiros
+      SET estado='aceptado',
+          orden_id=$1
+      WHERE id=$2
+    `,[orden.id, id]);
+
+    // =========================
+    // BUSCAR ENVIO PENDIENTE
+    // =========================
+    const envioRes = await client.query(`
+      SELECT id
+      FROM envios
+      WHERE cliente_id=$1
+        AND estado IN ('pendiente', 'esperando_pago')
+        AND orden_id IS NULL
+      LIMIT 1
+    `,[retiro.cliente_id]);
+
+    if(envioRes.rows.length > 0){
+
+      tieneEnvio = true;
+
+      // Marcar orden con envio
+      await client.query(`
+        UPDATE ordenes
+        SET tiene_envio=true
+        WHERE id=$1
+      `,[orden.id]);
+
+      // Vincular envio
+      await client.query(`
+        UPDATE envios
+        SET orden_id=$1
+        WHERE id=$2
+      `,[orden.id, envioRes.rows[0].id]);
+
+    }
+
+    await client.query("COMMIT");
+
+// =========================
+// DATOS PARA TICKET
+// =========================
+const datosRes = await client.query(`
+  SELECT 
+    o.id AS orden_id,
+    o.cliente_id,
+    c.nombre AS cliente,
+    r.direccion
+  FROM ordenes o
+  JOIN clientes c ON c.id = o.cliente_id
+  LEFT JOIN retiros r ON r.orden_id = o.id
+  WHERE o.id = $1
+`, [orden.id]);
+
+const datos = datosRes.rows[0];
+    // =========================
+    // GENERAR PDF PROVISORIO
+    // =========================
+    const pdf = generarTicketProvisorio({
+      id: orden.id,
+      cliente_id: datos.cliente_id,
+      cliente: datos.cliente,
+      direccion: datos.direccion,
+      tiene_envio: tieneEnvio
+    });
+
+    // ABRIR AUTOMATICAMENTE
+    exec(`start "" "${pdf}"`);
+
+    res.json({
+      ok:true,
+      orden_id: orden.id,
+      tiene_envio: tieneEnvio
+    });
+
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error(error);
+    res.status(500).json({error:"Error aceptando retiro"});
+  } finally {
+    client.release();
+  }
+};
+
+// ===============================
+// RECHAZAR RETIRO (local)
+// ===============================
+const rechazarRetiro = async (req,res)=>{
+  const { id } = req.params;
+
+  try {
+
+    const r = await pool.query(`
+      UPDATE retiros
+      SET estado='rechazado'
+      WHERE id=$1 AND estado='pendiente'
+      RETURNING *
+    `,[id]);
+
+    if(r.rows.length === 0){
+      return res.status(404).json({error:"Retiro no encontrado"});
+    }
+
+    res.json({ok:true});
+
+  } catch(error){
+    console.error(error);
+    res.status(500).json({error:"Error rechazando retiro"});
+  }
+};
+
+// ===============================
+// CANCELAR RETIRO CLIENTE
+// ===============================
+const cancelarRetiroCliente = async (req,res)=>{
+  const { id } = req.params;
+
+  try {
+
+    const r = await pool.query(`
+      UPDATE retiros
+      SET estado='cancelado_cliente'
+      WHERE id=$1 AND estado='pendiente'
+      RETURNING *
+    `,[id]);
+
+    if(r.rows.length === 0){
+      return res.status(404).json({error:"Retiro no encontrado"});
+    }
+
+    res.json({ok:true});
+
+  } catch(error){
+    console.error(error);
+    res.status(500).json({error:"Error cancelando retiro"});
+  }
+};
+
+// ===============================
+// OBTENER PRECIO POR ZONA
+// ===============================
+const getPrecioZona = (req, res) => {
+  const { zona } = req.params;
+
+  const precio = calcularPrecioZona(zona);
+
+  res.json({ precio });
+}; 
+
+// ===============================
+// MARCAR EN CAMINO
+// ===============================
+const marcarEnCamino = async (req,res)=>{
+  const { id } = req.params;
+
+  try {
+
+    const r = await pool.query(`
+      UPDATE retiros
+      SET estado='en_camino'
+      WHERE id=$1 AND estado='aceptado'
+      RETURNING *
+    `,[id]);
+
+    if(r.rows.length === 0){
+      return res.status(404).json({error:"Retiro no encontrado"});
+    }
+
+    res.json({ok:true});
+
+  } catch(error){
+    console.error(error);
+    res.status(500).json({error:"Error marcando en camino"});
+  }
+};
+
+module.exports = {
+  aceptarRetiro,
+  getPrecioZona,
+  rechazarRetiro,
+  cancelarRetiroCliente,
+  getRetirosPendientes,
+  solicitarRetiro,
+  crearRetiroPrePago,
+  marcarEnCamino
+};
