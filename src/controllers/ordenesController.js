@@ -791,7 +791,7 @@ const getServiciosOrden = async (req, res) => {
 
   try {
     const result = await pool.query(`
-      SELECT s.nombre, os.cantidad, os.precio
+      SELECT s.nombre, os.cantidad, os.precio_unitario AS precio
       FROM orden_servicios os
       JOIN servicios s ON os.servicio_id = s.id
       WHERE os.orden_id = $1
