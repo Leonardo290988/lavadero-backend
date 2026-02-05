@@ -22,7 +22,6 @@ const abrirCaja = async (req, res) => {
       FROM turnos_caja
       WHERE fecha = CURRENT_DATE
         AND turno = $1
-        AND estado = 'abierta'
       `,
       [turno]
     );
