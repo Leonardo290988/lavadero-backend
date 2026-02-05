@@ -1,4 +1,4 @@
-import { fechaArgentina } from "../utils/fecha";
+import { fechaArgentina } from "../utils/fecha.js";
 const pool = require('../db');
 const generarTicketPDF = require("../utils/generarTicketPDF");
 const path = require("path");

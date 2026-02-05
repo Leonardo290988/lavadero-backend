@@ -1,4 +1,4 @@
-import { fechaArgentina } from "../utils/fecha";
+import { fechaArgentina } from "../utils/fecha.js";
 const fs = require("fs");
 const path = require("path");
 const PDFDocument = require("pdfkit");
