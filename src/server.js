@@ -1,4 +1,5 @@
 require('dotenv').config();
+console.log("🕒 Hora servidor:", new Date().toString());
 const express = require('express');
 const cors = require('cors');
 const app = express();
