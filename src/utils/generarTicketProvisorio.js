@@ -1,9 +1,13 @@
-import { fechaArgentina } from "../utils/fecha.js";
-const fs = require("fs");
-const path = require("path");
-const PDFDocument = require("pdfkit");
+import fs from "fs";
+import path from "path";
+import PDFDocument from "pdfkit";
+import { fechaArgentina } from "./fecha.js";
+import { fileURLToPath } from "url";
 
-const generarTicketProvisorio = (orden) => {
+const __filename = fileURLToPath(import.meta.url);
+const _dirname = path.dirname(_filename);
+
+export default function generarTicketProvisorio(orden) {
 
   const carpeta = path.join(__dirname, "../pdf/provisorios");
 
@@ -11,38 +15,24 @@ const generarTicketProvisorio = (orden) => {
     fs.mkdirSync(carpeta, { recursive: true });
   }
 
-  const archivo = path.join(
-    carpeta,
-    `orden_${orden.id}_provisorio.pdf`
-  );
+  const archivo = path.join(carpeta, `orden_${orden.id}_provisorio.pdf`);
 
-  const doc = new PDFDocument({
-    size: [226, 600],
-    margin: 10
-  });
-
+  const doc = new PDFDocument({ size: [226, 600], margin: 10 });
   doc.pipe(fs.createWriteStream(archivo));
 
   doc.fontSize(20).text("LAVADEROS MORENO", { align: "center" });
   doc.moveDown(0.5);
-
   doc.fontSize(12).text("TICKET PROVISORIO", { align: "center" });
   doc.moveDown();
 
   doc.fontSize(12);
   doc.text(`Orden: ${orden.id}`);
-  doc.text(`Cliente ID: ${orden.cliente_id}`);
   doc.text(`Cliente: ${orden.cliente}`);
-  doc.text(`Dirección: ${orden.direccion || "Pendiente"}`);
   doc.text(`Fecha: ${fechaArgentina()}`);
 
   doc.moveDown();
   doc.text("------------------------");
-
-  doc.text("Servicios:");
-  doc.text("Pendientes de carga");
-
-  doc.moveDown();
+  doc.text("Servicios pendientes");
   doc.text("------------------------");
 
   if (orden.tiene_envio) {
@@ -53,8 +43,5 @@ const generarTicketProvisorio = (orden) => {
   doc.fontSize(10).text("Presentar este ticket al ingresar la ropa");
 
   doc.end();
-
   return archivo;
-};
-
-module.exports = generarTicketProvisorio;
+}

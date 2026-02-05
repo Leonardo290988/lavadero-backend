@@ -1,8 +1,11 @@
+import pool from "../db.js";
+import path from "path";
+import generarTicketPDF from "../utils/generarTicketPDF.js";
 import { fechaArgentina } from "../utils/fecha.js";
-const pool = require('../db');
-const generarTicketPDF = require("../utils/generarTicketPDF");
-const path = require("path");
+import { fileURLToPath } from "url";
 
+const __filename = fileURLToPath(import.meta.url);
+const _dirname = path.dirname(_filename);
 
 // ======================================
 // ABRIR CAJA
@@ -477,7 +480,7 @@ const getUltimoCierre = async (req,res)=>{
   });
 };
     
-module.exports = {
+export {
   abrirCaja,
   getCajaActual,
   registrarMovimiento,

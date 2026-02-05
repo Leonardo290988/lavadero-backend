@@ -1,9 +1,13 @@
 import fs from "fs";
 import path from "path";
+import PDFDocument from "pdfkit";
 import { fechaArgentina } from "./fecha.js";
-const PDFDocument = require("pdfkit");
+import { fileURLToPath } from "url";
 
-const generarTicketOrden = async (orden) => {
+const __filename = fileURLToPath(import.meta.url);
+const _dirname = path.dirname(_filename);
+
+export default function generarTicketOrden(orden) {
 
   const carpeta = path.join(__dirname, "../pdf/ordenes");
 
@@ -11,10 +15,7 @@ const generarTicketOrden = async (orden) => {
     fs.mkdirSync(carpeta, { recursive: true });
   }
 
-  const archivo = path.join(
-    carpeta,
-    `orden_${orden.id}.pdf`
-  );
+  const archivo = path.join(carpeta, `orden_${orden.id}.pdf`);
 
   const doc = new PDFDocument({
     size: [226, 600],
@@ -23,14 +24,12 @@ const generarTicketOrden = async (orden) => {
 
   doc.pipe(fs.createWriteStream(archivo));
 
-  // ===== ENCABEZADO =====
   doc.fontSize(22).text("LAVADEROS MORENO", { align: "center" });
   doc.moveDown(0.3);
 
   doc.fontSize(10).text("Servicio de Lavado", { align: "center" });
   doc.moveDown();
 
-  // ===== DATOS ORDEN =====
   doc.fontSize(12);
   doc.text(`Orden N°: ${orden.id}`);
   doc.text(`Cliente ID: ${orden.cliente_id}`);
@@ -39,37 +38,28 @@ const generarTicketOrden = async (orden) => {
   doc.text(`Fecha: ${fechaArgentina()}`);
 
   doc.moveDown();
-
-  // ===== LINEA =====
   doc.text("--------------------------------");
 
-  // ===== ITEMS =====
   orden.items.forEach(i => {
-    doc.fontSize(12).text(`${i.descripcion}`);
+    doc.text(i.descripcion);
     doc.text(`   $${i.precio}`);
   });
 
   doc.moveDown();
   doc.text("--------------------------------");
-
-  // ===== TOTAL =====
   doc.fontSize(16).text(`TOTAL: $${orden.total}`, { align: "right" });
 
   doc.moveDown();
 
-  // ===== ENVIO =====
-  if (orden.tiene_envio === true) {
+  if (orden.tiene_envio) {
     doc.fontSize(11).text("Incluye ENVÍO a domicilio", { align: "center" });
-    doc.moveDown();
   }
 
-  // ===== PIE =====
+  doc.moveDown();
   doc.fontSize(11).text("Gracias por su compra", { align: "center" });
   doc.fontSize(10).text("Conserve este comprobante", { align: "center" });
 
   doc.end();
 
   return archivo;
-};
-
-module.exports = generarTicketOrden;
+}

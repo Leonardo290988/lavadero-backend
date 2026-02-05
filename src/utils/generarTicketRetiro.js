@@ -1,11 +1,14 @@
-import { fechaArgentina } from "../utils/fecha.js";
-const fs = require("fs");
-const path = require("path");
-const PDFDocument = require("pdfkit");
+import fs from "fs";
+import path from "path";
+import PDFDocument from "pdfkit";
+import { fechaArgentina } from "./fecha.js";
+import { fileURLToPath } from "url";
 
-module.exports = function generarTicketRetiro({ id, cliente, items, total }) {
+const __filename = fileURLToPath(import.meta.url);
+const _dirname = path.dirname(_filename);
 
-  // 👉 carpeta pdf/retiros
+export default function generarTicketRetiro({ id, cliente, items, total }) {
+
   const carpeta = path.join(__dirname, "../pdf/retiros");
 
   if (!fs.existsSync(carpeta)) {
@@ -14,11 +17,7 @@ module.exports = function generarTicketRetiro({ id, cliente, items, total }) {
 
   const archivo = path.join(carpeta, `retiro_${id}.pdf`);
 
-  const doc = new PDFDocument({
-    size: [200, 500],
-    margin: 10
-  });
-
+  const doc = new PDFDocument({ size: [200, 500], margin: 10 });
   doc.pipe(fs.createWriteStream(archivo));
 
   doc.fontSize(14).text("LAVADEROS MORENO", { align: "center" });
@@ -30,25 +29,22 @@ module.exports = function generarTicketRetiro({ id, cliente, items, total }) {
   doc.text(`Orden: ${id}`);
   doc.text(`Cliente: ${cliente}`);
   doc.text(`Fecha: ${fechaArgentina()}`);
-  doc.moveDown();
 
+  doc.moveDown();
   doc.text("--------------------------");
 
   items.forEach(i => {
     doc.text(`${i.descripcion} x${i.cantidad}`);
     doc.text(`$${i.precio}`);
-    doc.moveDown(0.2);
   });
 
   doc.text("--------------------------");
   doc.moveDown();
-
   doc.fontSize(11).text(`TOTAL: $${total}`, { align: "center" });
-  doc.moveDown();
 
+  doc.moveDown();
   doc.fontSize(8).text("Gracias por su compra", { align: "center" });
 
   doc.end();
-
   return archivo;
-};
+}
