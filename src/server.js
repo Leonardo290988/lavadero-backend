@@ -8,6 +8,12 @@ app.use("/pdf", express.static(path.join(__dirname, "pdf")));
 
 app.use(cors({ origin: "*" }));
 app.options("*", cors());   // ✅ PRE-FLIGHT CORS FIX
+app.use((req,res,next)=>{
+  res.header("Access-Control-Allow-Origin","*");
+  res.header("Access-Control-Allow-Headers","*");
+  res.header("Access-Control-Allow-Methods","GET,POST,PUT,DELETE,OPTIONS");
+  next();
+});
 app.use(express.json());
 
 console.log('🔥🔥🔥 ESTE SERVER ES EL NUEVO 🔥🔥🔥');
