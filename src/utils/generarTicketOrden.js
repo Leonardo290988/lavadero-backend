@@ -1,3 +1,4 @@
+import { fechaArgentina } from "../utils/fecha";
 const fs = require("fs");
 const path = require("path");
 const PDFDocument = require("pdfkit");
@@ -35,7 +36,7 @@ const generarTicketOrden = async (orden) => {
   doc.text(`Cliente ID: ${orden.cliente_id}`);
   doc.text(`Cliente: ${orden.cliente}`);
   doc.text(`Tel: ${orden.telefono || "-"}`);
-  doc.text(`Fecha: ${new Date().toLocaleString("es-AR")}`);
+  doc.text(`Fecha: ${fechaArgentina()}`);
 
   doc.moveDown();
 

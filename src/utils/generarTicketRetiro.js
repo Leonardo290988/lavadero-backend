@@ -1,3 +1,4 @@
+import { fechaArgentina } from "../utils/fecha";
 const fs = require("fs");
 const path = require("path");
 const PDFDocument = require("pdfkit");
@@ -28,7 +29,7 @@ module.exports = function generarTicketRetiro({ id, cliente, items, total }) {
   doc.fontSize(9);
   doc.text(`Orden: ${id}`);
   doc.text(`Cliente: ${cliente}`);
-  doc.text(`Fecha: ${new Date().toLocaleString("es-AR")}`);
+  doc.text(`Fecha: ${fechaArgentina()}`);
   doc.moveDown();
 
   doc.text("--------------------------");
