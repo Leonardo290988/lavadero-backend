@@ -1,3 +1,4 @@
+process.env.TZ = "America/Argentina/Buenos_Aires";
 require('dotenv').config();
 console.log("🕒 Hora servidor:", new Date().toString());
 const express = require('express');
