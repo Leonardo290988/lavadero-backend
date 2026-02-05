@@ -6,6 +6,7 @@ const path = require("path");
 // ABRIR CAJA
 // ======================================
 const abrirCaja = async (req, res) => {
+  console.log("📥 BODY abrirCaja:", req.body);
   const { turno, inicio_caja } = req.body;
 
   if (inicio_caja === undefined || inicio_caja === null) {
