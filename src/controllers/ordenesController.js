@@ -562,13 +562,15 @@ const archivoPDF = generarTicketRetiro({
   total: totalItems
 });
 
-exec(`start "" "${archivoPDF}"`);
+// ❌ NO abrir PDF en servidor
+// exec(start "" "${archivoPDF}");
 
 res.json({
   ok: true,
   total: totalItems,
   senia,
-  restante
+  restante,
+  pdf: `/pdf/retiros/retiro_${id}.pdf`
 });
 
   } catch (err) {
