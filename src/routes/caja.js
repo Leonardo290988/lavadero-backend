@@ -1,51 +1,41 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 
+const cajaController = require("../controllers/cajaController");
+
 console.log("📦 archivo routes/caja.js cargado");
-
-const {
-  abrirCaja,
-  getCajaActual,
-  imprimirPDFResumen,
-  imprimirResumenPorId,
-  registrarMovimiento,
-  getUltimoCierre,
-  cerrarCaja,
-  getTurnos,
-  getResumenTurno,
-  getResumenesDiarios,
-  getResumenesSemanales,
-  getResumenesMensuales
-} = require('../controllers/cajaController');
-
-console.log('💰 ROUTES CAJA CARGADAS');
+console.log("💰 ROUTES CAJA CARGADAS");
 
 // Abrir caja
-router.post('/abrir', abrirCaja);
+router.post("/abrir", cajaController.abrirCaja);
 
 // Obtener caja actual
-router.get('/actual', getCajaActual);
-router.get("/resumenes/imprimir/:id", imprimirResumenPorId);
-
-
-router.get('/pdf/:tipo/:archivo', imprimirPDFResumen);
-router.get('/ultimo-cierre', getUltimoCierre);
-
-router.get('/resumenes/semanales', getResumenesSemanales);
-router.get('/resumenes/mensuales', getResumenesMensuales);
+router.get("/actual", cajaController.getCajaActual);
 
 // Registrar movimiento
-router.post('/movimiento', registrarMovimiento);
-
-// Resumen diario
-router.get('/resumenes/diarios', getResumenesDiarios);
-
-// Resumen por turno
-router.get('/resumen/turno/:caja_id', getResumenTurno);
-
-router.get("/turnos", getTurnos);
+router.post("/movimiento", cajaController.registrarMovimiento);
 
 // Cerrar caja
-router.post('/cerrar/:cajaId', cerrarCaja);
+router.post("/cerrar/:cajaId", cajaController.cerrarCaja);
+
+// Último cierre
+router.get("/ultimo-cierre", cajaController.getUltimoCierre);
+
+// Turnos
+router.get("/turnos", cajaController.getTurnos);
+
+// Resumen turno individual
+router.get("/resumen/turno/:caja_id", cajaController.getResumenTurno);
+
+// Resúmenes
+router.get("/resumenes/diarios", cajaController.getResumenesDiarios);
+router.get("/resumenes/semanales", cajaController.getResumenesSemanales);
+router.get("/resumenes/mensuales", cajaController.getResumenesMensuales);
+
+// Imprimir resumen por ID
+router.get("/resumenes/imprimir/:id", cajaController.imprimirResumenPorId);
+
+// PDFs
+router.get("/pdf/:tipo/:archivo", cajaController.imprimirPDFResumen);
 
 module.exports = router;

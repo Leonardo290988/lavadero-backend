@@ -549,6 +549,7 @@ module.exports = {
   cerrarCaja,
   getResumenTurno,
   imprimirPDFResumen,
+  imprimirResumenPorId,
   getTurnos,
   getResumenesDiarios,
   getResumenesSemanales,
