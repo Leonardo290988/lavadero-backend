@@ -522,7 +522,7 @@ WHERE o.id=$1
     await client.query(`
       UPDATE ordenes
       SET estado='retirada',
-          fecha_retiro=NOW()
+          fecha_retiro = NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'
       WHERE id=$1
     `,[id]);
 
