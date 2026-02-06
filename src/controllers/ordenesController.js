@@ -70,7 +70,7 @@ const fechaRetiroFinal = fecha_retiro || null;
 
     const result = await client.query(`
       INSERT INTO ordenes 
-      (cliente_id, estado, fecha_ingreso, fecha_retiro, senia, uisuario_id)
+      (cliente_id, estado, fecha_ingreso, fecha_retiro, senia, usuario_id)
       VALUES ($1,$2,$3,$4,$5,$6)
       RETURNING *
     `,
