@@ -1,7 +1,6 @@
 import fs from "fs";
 import path from "path";
 import PDFDocument from "pdfkit";
-import { fechaArgentina } from "./fecha.js";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -35,7 +34,7 @@ export default function generarTicketOrden(orden) {
   doc.text(`Cliente ID: ${orden.cliente_id}`);
   doc.text(`Cliente: ${orden.cliente}`);
   doc.text(`Tel: ${orden.telefono || "-"}`);
-  doc.text(`Fecha: ${fechaArgentina()}`);
+  doc.text(`Fecha: ${new Date().toLocaleString("es-AR")}`);
 
   doc.moveDown();
   doc.text("--------------------------------");

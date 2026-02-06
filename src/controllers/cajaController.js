@@ -1,7 +1,6 @@
 import pool from "../db.js";
 import path from "path";
 import generarTicketPDF from "../utils/generarTicketPDF.js";
-import { fechaArgentina } from "../utils/fecha.js";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -215,7 +214,7 @@ const cerrarCaja = async (req, res) => {
     ]);
 
     await generarTicketPDF("turno", {
-      periodo: `${caja.rows[0].fecha} ${caja.rows[0].turno} ${fechaArgentina()}`,
+      periodo: `${caja.rows[0].fecha} ${caja.rows[0].turno} ${new Date().toLocaleTimeString("es-AR")}`,
       efectivo: ingresos,
       digital,
       gastos,
@@ -260,7 +259,7 @@ const cerrarCaja = async (req, res) => {
       ]);
 
       await generarTicketPDF("diario", {
-        periodo: fechaArgentina(),
+        periodo: caja.rows[0].fecha,
         efectivo: d.efectivo,
         digital: d.digital,
         gastos: d.gastos,
@@ -271,7 +270,7 @@ const cerrarCaja = async (req, res) => {
     }
 
     // ========= SEMANAL =========
-    const fechaCaja = fechaArgentina(caja.rows[0].fecha);
+    const fechaCaja = new Date(caja.rows[0].fecha);
 
     if (fechaCaja.getDay() === 6) {
 
@@ -309,7 +308,7 @@ const cerrarCaja = async (req, res) => {
       ]);
 
       await generarTicketPDF("semanal", {
-        periodo: fechaArgentina(),
+        periodo: caja.rows[0].fecha,
         efectivo: s.efectivo,
         digital: s.digital,
         gastos: s.gastos,
@@ -362,7 +361,7 @@ const cerrarCaja = async (req, res) => {
       ]);
 
       await generarTicketPDF("mensual", {
-        periodo: fechaArgentina(),
+        periodo: caja.rows[0].fecha,
         efectivo: m.efectivo,
         digital: m.digital,
         gastos: m.gastos,
