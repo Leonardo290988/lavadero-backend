@@ -23,7 +23,7 @@ function generarTicketRetiro({ id, cliente, items, subtotal, senia, total }) {
   doc.fontSize(9);
   doc.text(`Orden: ${id}`);
   doc.text(`Cliente: ${cliente}`);
-  doc.text(`Fecha: ${new Date().toLocaleString("es-AR")}`);
+  doc.text(`Fecha: ${new Date().toLocaleString("es-AR", { hour12: false})}`);
 
   doc.moveDown();
   doc.text("--------------------------");

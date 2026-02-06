@@ -526,7 +526,7 @@ WHERE o.id=$1
     await client.query(`
       UPDATE ordenes
       SET estado='retirada',
-          fecha_retiro = NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires',
+          fecha_retiro = NOW(),
           usuario_retiro_id = $2
       WHERE id=$1
     `,[id, usuario_id]);

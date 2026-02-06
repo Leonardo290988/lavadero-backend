@@ -37,7 +37,7 @@ function imprimirTicket({
   doc.text(`Orden N°: ${id}`);
   doc.text(`Cliente: ${cliente}`);
   doc.text(`Tel: ${telefono || "-"}`);
-  doc.text(`Fecha: ${new Date().toLocaleString("es-AR")}`);
+  doc.text(`Fecha: ${new Date().toLocaleString("es-AR", { hour12: false})}`);
 
   doc.moveDown();
   doc.text("--------------------------------");

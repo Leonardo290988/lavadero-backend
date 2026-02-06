@@ -26,7 +26,7 @@ function generarTicketProvisorio(orden) {
   doc.fontSize(12);
   doc.text(`Orden: ${orden.id}`);
   doc.text(`Cliente: ${orden.cliente}`);
-  doc.text(`Fecha: ${new Date().toLocaleString("es-AR")}`);
+  doc.text(`Fecha: ${new Date().toLocaleString("es-AR", { hour12: false})}`);
 
   doc.moveDown();
   doc.text("------------------------");

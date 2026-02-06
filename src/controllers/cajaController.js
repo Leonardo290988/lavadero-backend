@@ -413,7 +413,7 @@ const getResumenesDiarios = async (req,res)=>{
   SELECT 
     id,
     fecha_desde,
-    creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires' AS creado_en,
+    creado_en,
     ingresos_efectivo,
     ingresos_digital,
     gastos,
@@ -432,7 +432,7 @@ const getResumenesSemanales = async (req,res)=>{
   SELECT 
     id,
     fecha_desde,
-    creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires' AS creado_en,
+    creado_en,
     ingresos_efectivo,
     ingresos_digital,
     gastos,
@@ -451,7 +451,7 @@ const getResumenesMensuales = async (req,res)=>{
   SELECT 
     id,
     fecha_desde,
-    creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires' AS creado_en,
+    creado_en ,
     ingresos_efectivo,
     ingresos_digital,
     gastos,
