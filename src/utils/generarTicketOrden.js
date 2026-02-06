@@ -53,6 +53,10 @@ function generarTicketOrden({
 
   doc.text(`SUBTOTAL: $${subtotal}`);
 
+  if (promoDescuento > 0) {
+  doc.text(`DESCUENTO PROMO: -$${promoDescuento}`);
+}
+
   if (senia > 0) {
     doc.text(`SEÑA: -$${senia}`);
   }

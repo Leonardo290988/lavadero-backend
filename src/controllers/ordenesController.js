@@ -875,35 +875,40 @@ const confirmarOrden = async (req, res) => {
 
    
     // Calcular subtotal servicios
-let total = 0;
+let subtotalReal = 0;
 let acolchados = [];
 
-// Separar acolchados del resto
+// Separar acolchados
 for (const s of items) {
 
   if (s.descripcion.toLowerCase().includes("acolchado")) {
     for (let i = 0; i < s.cantidad; i++) {
       acolchados.push(Number(s.precio));
     }
+    subtotalReal += Number(s.precio) * Number(s.cantidad);
   } else {
-    total += Number(s.precio) * Number(s.cantidad);
+    const linea = Number(s.precio) * Number(s.cantidad);
+    subtotalReal += linea;
   }
 }
 
-// Promo 3x2 acolchados
+// ===== PROMO 3x2 =====
 acolchados.sort((a, b) => b - a);
 
+let promoDescuento = 0;
+
 acolchados.forEach((precio, index) => {
-  if ((index + 1) % 3 !== 0) {
-    total += precio;
+  if ((index + 1) % 3 === 0) {
+    promoDescuento += precio;   // gratis
   }
 });
 
-// Subtotal antes de seña
-const subtotal = total;
+let total = subtotalReal - promoDescuento;
 
-// Descontar seña
-total -= Number(orden.senia || 0);
+// ===== SEÑA =====
+const senia = Number(orden.senia || 0);
+total -= senia;
+
 if (total < 0) total = 0;
 
     // Actualizar orden
@@ -914,14 +919,15 @@ if (total < 0) total = 0;
     `, [total, id]);
 
     // Generar ticket PDF
- await generarTicketOrden({
+await generarTicketOrden({
   id: orden.id,
   cliente_id: orden.cliente_id,
   cliente: orden.cliente,
   telefono: orden.telefono,
   items,
-  subtotal,
-  senia: orden.senia,
+  subtotal: subtotalReal,
+  promoDescuento,
+  senia,
   total,
   tiene_envio: orden.tiene_envio
 });
@@ -932,8 +938,9 @@ await imprimirTicket({
   cliente: orden.cliente,
   telefono: orden.telefono,
   items,
-  subtotal,
-  senia: orden.senia,
+  subtotal: subtotalReal,
+  promoDescuento,
+  senia,
   total,
   tiene_envio: orden.tiene_envio
 });
