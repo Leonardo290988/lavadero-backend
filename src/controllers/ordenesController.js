@@ -488,7 +488,7 @@ const retirarOrden = async (req, res) => {
 FROM ordenes o
 JOIN clientes c ON c.id = o.cliente_id
 WHERE o.id=$1
-    `, [id, usuario_id]);
+    `, [id]);
 
 
     if (ord.rows.length === 0) {
@@ -526,10 +526,10 @@ WHERE o.id=$1
     await client.query(`
       UPDATE ordenes
       SET estado='retirada',
-          fecha_retiro = NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'
+          fecha_retiro = NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires',
           usuario_retiro_id = $2
       WHERE id=$1
-    `,[id]);
+    `,[id, usuario_id]);
 
     if (restante > 0) {
       await client.query(`
