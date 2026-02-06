@@ -474,7 +474,7 @@ const getRetirosHoy = async (req, res) => {
 // PUT /ordenes/:id/retirar
 const retirarOrden = async (req, res) => {
   const { id } = req.params;
-  const { metodo_pago='Efectivo' } = req.body;
+  const { metodo_pago='Efectivo', usuario_id } = req.body;
 
   const client = await pool.connect();
 
@@ -488,7 +488,7 @@ const retirarOrden = async (req, res) => {
 FROM ordenes o
 JOIN clientes c ON c.id = o.cliente_id
 WHERE o.id=$1
-    `, [id]);
+    `, [id, usuario_id]);
 
 
     if (ord.rows.length === 0) {
@@ -527,6 +527,7 @@ WHERE o.id=$1
       UPDATE ordenes
       SET estado='retirada',
           fecha_retiro = NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'
+          usuario_retiro_id = $2
       WHERE id=$1
     `,[id]);
 
@@ -759,10 +760,12 @@ const getOrdenesRetiradas = async (req, res) => {
         c.nombre AS cliente,
         c.telefono,
         o.total,
-        o.fecha_retiro
-      FROM ordenes o
-      JOIN clientes c ON o.cliente_id = c.id
-      WHERE o.estado = 'retirada'
+        o.fecha_retiro,
+        u.nombre AS usuario
+        FROM ordenes o
+JOIN clientes c ON o.cliente_id = c.id
+LEFT JOIN usuarios u ON u.id = o.usuario_retiro_id
+WHERE o.estado = 'retirada'
     `;
 
     const params = [];
