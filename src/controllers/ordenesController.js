@@ -395,7 +395,7 @@ const getDetalleOrden = async (req, res) => {
         o.id AS orden_id,
         o.estado,
         o.fecha_ingreso AT TIME ZONE 'America/Argentina/Buenos_Aires' AS fecha_ingreso,
-        o.fecha_retiro AT TIME ZONE 'America/Argentina/Buenos_Aires' AS fecha_ingreso,
+        o.fecha_retiro AT TIME ZONE 'America/Argentina/Buenos_Aires' AS fecha_retiro,
         o.senia,
         o.total,
         c.nombre AS cliente,
@@ -915,6 +915,18 @@ if (total < 0) total = 0;
 
     // Generar ticket PDF
  await generarTicketOrden({
+  id: orden.id,
+  cliente_id: orden.cliente_id,
+  cliente: orden.cliente,
+  telefono: orden.telefono,
+  items,
+  subtotal,
+  senia: orden.senia,
+  total,
+  tiene_envio: orden.tiene_envio
+});
+
+await imprimirTicket({
   id: orden.id,
   cliente_id: orden.cliente_id,
   cliente: orden.cliente,

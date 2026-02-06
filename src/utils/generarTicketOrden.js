@@ -4,17 +4,23 @@ const PDFDocument = require("pdfkit");
 
 const carpeta = path.join(__dirname, "../pdf/ordenes");
 
-function generarTicketOrden(orden) {
-
-  if (datos.senia > 0) {
-  doc.text(`Seña: $${datos.senia}`);
-}
+function generarTicketOrden({ 
+  id,
+  cliente_id,
+  cliente,
+  telefono,
+  items,
+  subtotal,
+  senia,
+  total,
+  tiene_envio
+}) {
 
   if (!fs.existsSync(carpeta)) {
     fs.mkdirSync(carpeta, { recursive: true });
   }
 
-  const archivo = path.join(carpeta, `orden_${orden.id}.pdf`);
+  const archivo = path.join(carpeta, `orden_${id}.pdf`);
 
   const doc = new PDFDocument({
     size: [226, 600],
@@ -23,46 +29,45 @@ function generarTicketOrden(orden) {
 
   doc.pipe(fs.createWriteStream(archivo));
 
-  doc.fontSize(22).text("LAVADEROS MORENO", { align: "center" });
+  doc.fontSize(20).text("LAVADEROS MORENO", { align: "center" });
   doc.moveDown(0.3);
-
-  doc.fontSize(10).text("Servicio de Lavado", { align: "center" });
+  doc.fontSize(10).text("Ticket de Ingreso", { align: "center" });
   doc.moveDown();
 
-  doc.fontSize(12);
-  doc.text(`Orden N°: ${orden.id}`);
-  doc.text(`Cliente ID: ${orden.cliente_id}`);
-  doc.text(`Cliente: ${orden.cliente}`);
-  doc.text(`Tel: ${orden.telefono || "-"}`);
+  doc.fontSize(11);
+  doc.text(`Orden N°: ${id}`);
+  doc.text(`Cliente: ${cliente}`);
+  doc.text(`Tel: ${telefono || "-"}`);
   doc.text(`Fecha: ${new Date().toLocaleString("es-AR")}`);
 
   doc.moveDown();
   doc.text("--------------------------------");
 
-  orden.items.forEach(i => {
-    doc.text(i.descripcion);
-    doc.text(`   $${i.precio}`);
+  items.forEach(i => {
+    doc.text(`${i.descripcion} x${i.cantidad}`);
+    doc.text(`$${i.precio}`);
   });
 
-  doc.moveDown();
   doc.text("--------------------------------");
- doc.text(`Subtotal: $${orden.subtotal}`);
-
-  if (Number(orden.senia) > 0) {
-    doc.text(`Seña: -$${orden.senia}`);
-  }
-
-  doc.fontSize(16).text(`TOTAL: $${orden.total}`, { align: "right" });
-
   doc.moveDown();
 
-  if (orden.tiene_envio) {
-    doc.fontSize(11).text("Incluye ENVÍO a domicilio", { align: "center" });
+  doc.text(`SUBTOTAL: $${subtotal}`);
+
+  if (senia > 0) {
+    doc.text(`SEÑA: -$${senia}`);
   }
 
   doc.moveDown();
-  doc.fontSize(11).text("Gracias por su compra", { align: "center" });
-  doc.fontSize(10).text("Conserve este comprobante", { align: "center" });
+  doc.fontSize(14).text(`TOTAL: $${total}`, { align: "right" });
+
+  if (tiene_envio) {
+    doc.moveDown();
+    doc.fontSize(10).text("Incluye ENVÍO a domicilio", { align: "center" });
+  }
+
+  doc.moveDown();
+  doc.fontSize(9).text("Gracias por su compra", { align: "center" });
+  doc.fontSize(9).text("Conserve este comprobante", { align: "center" });
 
   doc.end();
 

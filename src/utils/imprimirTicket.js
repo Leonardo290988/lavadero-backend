@@ -1,80 +1,71 @@
-const ThermalPrinter = require("node-thermal-printer").printer;
-const PrinterTypes = require("node-thermal-printer").types;
+const fs = require("fs");
+const path = require("path");
+const PDFDocument = require("pdfkit");
 
-async function imprimirTicket(datos) {
-  try {
+const carpeta = path.join(__dirname, "../pdf/impresiones");
 
-    const printer = new ThermalPrinter({
-      type: PrinterTypes.GENERIC,
-      interface: "printer:POS80",
-      options: {
-        timeout: 5000
-      }
-    });
+function imprimirTicket({
+  id,
+  cliente,
+  telefono,
+  items,
+  subtotal,
+  senia,
+  total,
+  tiene_envio
+}) {
 
-    console.log("🖨 Probando impresora...");
-    const isConnected = await printer.isPrinterConnected();
-    console.log("Conectada:", isConnected);
-
-    if (!isConnected) {
-      console.log("❌ Impresora no conectada");
-      return false;
-    }
-
-    // =========================
-    // ENCABEZADO
-    // =========================
-    printer.alignCenter();
-    printer.setTextDoubleHeight();
-    printer.println("LAVADEROS MORENO");
-    printer.setTextNormal();
-    printer.println("----------------------------");
-
-    // =========================
-    // DATOS CLIENTE
-    // =========================
-    printer.alignLeft();
-    printer.println(`Orden: ${datos.id}`);
-    printer.println(`Cliente: ${datos.cliente}`);
-    printer.println(`Ingreso: ${datos.fecha_ingreso}`);
-    printer.println(`Retiro: ${datos.fecha_retiro}`);
-    printer.println("----------------------------");
-
-    // =========================
-    // SERVICIOS
-    // =========================
-    printer.println("Servicios:");
-
-    datos.servicios.forEach(s => {
-      printer.println(`- ${s.nombre}  $${s.precio}`);
-    });
-
-    printer.println("----------------------------");
-
-    // =========================
-    // TOTALES
-    // =========================
-    printer.println(`TOTAL: $${datos.total}`);
-    printer.println(`SEÑA: $${datos.senia}`);
-    printer.println(`SALDO: $${datos.total - datos.senia}`);
-
-    printer.println("----------------------------");
-    printer.println("Gracias por su confianza");
-
-    // =========================
-    // CORTE
-    // =========================
-    printer.cut();
-
-    await printer.execute();
-
-    console.log("✅ Ticket impreso correctamente");
-    return true;
-
-  } catch (error) {
-    console.error("🔥 Error imprimiendo:", error.message);
-    return false;
+  if (!fs.existsSync(carpeta)) {
+    fs.mkdirSync(carpeta, { recursive: true });
   }
+
+  const archivo = path.join(carpeta, `ticket_${id}.pdf`);
+
+  const doc = new PDFDocument({
+    size: [226, 600],
+    margin: 10
+  });
+
+  doc.pipe(fs.createWriteStream(archivo));
+
+  doc.fontSize(20).text("LAVADEROS MORENO", { align: "center" });
+  doc.moveDown(0.3);
+  doc.fontSize(10).text("Ticket Orden", { align: "center" });
+  doc.moveDown();
+
+  doc.fontSize(11);
+  doc.text(`Orden N°: ${id}`);
+  doc.text(`Cliente: ${cliente}`);
+  doc.text(`Tel: ${telefono || "-"}`);
+  doc.text(`Fecha: ${new Date().toLocaleString("es-AR")}`);
+
+  doc.moveDown();
+  doc.text("--------------------------------");
+
+  items.forEach(i => {
+    doc.text(`${i.descripcion} x${i.cantidad}`);
+    doc.text(`$${i.precio}`);
+  });
+
+  doc.text("--------------------------------");
+  doc.moveDown();
+
+  doc.text(`SUBTOTAL: $${subtotal}`);
+
+  if (senia > 0) {
+    doc.text(`SEÑA: -$${senia}`);
+  }
+
+  doc.moveDown();
+  doc.fontSize(14).text(`TOTAL: $${total}`, { align: "right" });
+
+  if (tiene_envio) {
+    doc.moveDown();
+    doc.fontSize(10).text("Incluye ENVÍO a domicilio", { align: "center" });
+  }
+
+  doc.end();
+  return archivo;
 }
 
 module.exports = imprimirTicket;

@@ -4,7 +4,7 @@ const PDFDocument = require("pdfkit");
 
 const carpeta = path.join(__dirname, "../pdf/retiros");
 
-  function generarTicketRetiro({ id, cliente, items, total }) {
+function generarTicketRetiro({ id, cliente, items, subtotal, senia, total }) {
 
   if (!fs.existsSync(carpeta)) {
     fs.mkdirSync(carpeta, { recursive: true });
@@ -34,12 +34,16 @@ const carpeta = path.join(__dirname, "../pdf/retiros");
   });
 
   doc.text("--------------------------");
-  doc.text(`Subtotal: $${subtotal}`);
 
-  if (Number(senia) > 0) {
-    doc.text(`Seña: -$${senia}`);
+  doc.moveDown();
+
+  doc.text(`SUBTOTAL: $${subtotal}`);
+
+  if (senia > 0) {
+    doc.text(`SEÑA: -$${senia}`);
   }
 
+  doc.moveDown();
   doc.fontSize(11).text(`TOTAL A PAGAR: $${total}`, { align: "center" });
 
   doc.moveDown();
