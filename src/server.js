@@ -5,6 +5,7 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 const path = require("path");
+import usuariosRoutes from "./routes/usuarios.js";
 
 app.use("/pdf", express.static(path.join(__dirname, "pdf")));
 
@@ -40,6 +41,7 @@ app.use('/retiros', retirosRoutes);
 app.use("/pagos", pagosRoutes);
 app.use("/webhook", webhookRoutes);
 app.use("/envios", enviosRoutes);
+app.use("/usuarios", usuariosRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
