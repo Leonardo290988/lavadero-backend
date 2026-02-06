@@ -6,6 +6,10 @@ const carpeta = path.join(__dirname, "../pdf/ordenes");
 
 function generarTicketOrden(orden) {
 
+  if (datos.senia > 0) {
+  doc.text(`Seña: $${datos.senia}`);
+}
+
   if (!fs.existsSync(carpeta)) {
     fs.mkdirSync(carpeta, { recursive: true });
   }
@@ -42,6 +46,12 @@ function generarTicketOrden(orden) {
 
   doc.moveDown();
   doc.text("--------------------------------");
+ doc.text(`Subtotal: $${orden.subtotal}`);
+
+  if (Number(orden.senia) > 0) {
+    doc.text(`Seña: -$${orden.senia}`);
+  }
+
   doc.fontSize(16).text(`TOTAL: $${orden.total}`, { align: "right" });
 
   doc.moveDown();
@@ -58,4 +68,5 @@ function generarTicketOrden(orden) {
 
   return archivo;
 }
+
 module.exports = generarTicketOrden;

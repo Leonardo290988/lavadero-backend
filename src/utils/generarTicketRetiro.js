@@ -6,7 +6,6 @@ const carpeta = path.join(__dirname, "../pdf/retiros");
 
   function generarTicketRetiro({ id, cliente, items, total }) {
 
-
   if (!fs.existsSync(carpeta)) {
     fs.mkdirSync(carpeta, { recursive: true });
   }
@@ -35,8 +34,13 @@ const carpeta = path.join(__dirname, "../pdf/retiros");
   });
 
   doc.text("--------------------------");
-  doc.moveDown();
-  doc.fontSize(11).text(`TOTAL: $${total}`, { align: "center" });
+  doc.text(`Subtotal: $${subtotal}`);
+
+  if (Number(senia) > 0) {
+    doc.text(`Seña: -$${senia}`);
+  }
+
+  doc.fontSize(11).text(`TOTAL A PAGAR: $${total}`, { align: "center" });
 
   doc.moveDown();
   doc.fontSize(8).text("Gracias por su compra", { align: "center" });
@@ -44,4 +48,5 @@ const carpeta = path.join(__dirname, "../pdf/retiros");
   doc.end();
   return archivo;
 }
+
 module.exports = generarTicketRetiro;

@@ -394,8 +394,8 @@ const getDetalleOrden = async (req, res) => {
       SELECT
         o.id AS orden_id,
         o.estado,
-        o.fecha_ingreso,
-        o.fecha_retiro,
+        o.fecha_ingreso AT TIME ZONE 'America/Argentina/Buenos_Aires' AS fecha_ingreso,
+        o.fecha_retiro AT TIME ZONE 'America/Argentina/Buenos_Aires' AS fecha_ingreso,
         o.senia,
         o.total,
         c.nombre AS cliente,
@@ -558,15 +558,35 @@ WHERE o.id=$1
 const items = itemsRes.rows;
 
 let totalItems = 0;
+let acolchados = [];
 
 for (const i of items) {
-  totalItems += Number(i.precio) * Number(i.cantidad);
+
+  if (i.descripcion.toLowerCase().includes("acolchado")) {
+    for (let x = 0; x < i.cantidad; x++) {
+      acolchados.push(Number(i.precio));
+    }
+  } else {
+    totalItems += Number(i.precio) * Number(i.cantidad);
+  }
 }
+
+// Promo 3x2
+acolchados.sort((a,b)=>b-a);
+acolchados.forEach((p,idx)=>{
+  if ((idx+1)%3 !== 0) totalItems += p;
+});
+
+// Descontar seña
+totalItems -= Number(senia || 0);
+if (totalItems < 0) totalItems = 0;
 
 const archivoPDF = generarTicketRetiro({
   id,
   cliente: ord.rows[0].cliente,
   items,
+  subtotal: totalItems + senia,
+  senia,
   total: totalItems
 });
 
@@ -853,11 +873,38 @@ const confirmarOrden = async (req, res) => {
 
     const items = itemsRes.rows;
 
-    // Calcular total
-    const total = items.reduce(
-      (acc, i) => acc + Number(i.precio) * Number(i.cantidad),
-      0
-    );
+   
+    // Calcular subtotal servicios
+let total = 0;
+let acolchados = [];
+
+// Separar acolchados del resto
+for (const s of items) {
+
+  if (s.descripcion.toLowerCase().includes("acolchado")) {
+    for (let i = 0; i < s.cantidad; i++) {
+      acolchados.push(Number(s.precio));
+    }
+  } else {
+    total += Number(s.precio) * Number(s.cantidad);
+  }
+}
+
+// Promo 3x2 acolchados
+acolchados.sort((a, b) => b - a);
+
+acolchados.forEach((precio, index) => {
+  if ((index + 1) % 3 !== 0) {
+    total += precio;
+  }
+});
+
+// Subtotal antes de seña
+const subtotal = total;
+
+// Descontar seña
+total -= Number(orden.senia || 0);
+if (total < 0) total = 0;
 
     // Actualizar orden
     await pool.query(`
@@ -867,26 +914,18 @@ const confirmarOrden = async (req, res) => {
     `, [total, id]);
 
     // Generar ticket PDF
-    await generarTicketOrden({
-      id: orden.id,
-      cliente_id: orden.cliente_id,
-      cliente: orden.cliente,
-      telefono: orden.telefono,
-      items,
-      total,
-      tiene_envio: orden.tiene_envio   // ✅ NUEVO
-    });
+ await generarTicketOrden({
+  id: orden.id,
+  cliente_id: orden.cliente_id,
+  cliente: orden.cliente,
+  telefono: orden.telefono,
+  items,
+  subtotal,
+  senia: orden.senia,
+  total,
+  tiene_envio: orden.tiene_envio
+});
 
-    // Imprimir ticket
-    await imprimirTicket({
-      id: orden.id,
-      cliente_id: orden.cliente_id,
-      cliente: orden.cliente,
-      telefono: orden.telefono,
-      items,
-      total,
-      tiene_envio: orden.tiene_envio   // ✅ NUEVO
-    });
 
     console.log("✅ TICKET GENERADO");
 
