@@ -413,7 +413,7 @@ const getResumenesDiarios = async (req,res)=>{
   SELECT 
     id,
     fecha_desde,
-    creado_en,
+    creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires' AS creado_en,
     ingresos_efectivo,
     ingresos_digital,
     gastos,
@@ -432,7 +432,7 @@ const getResumenesSemanales = async (req,res)=>{
   SELECT 
     id,
     fecha_desde,
-    creado_en,
+    creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires' AS creado_en,
     ingresos_efectivo,
     ingresos_digital,
     gastos,
@@ -451,7 +451,7 @@ const getResumenesMensuales = async (req,res)=>{
   SELECT 
     id,
     fecha_desde,
-    creado_en,
+    creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires' AS creado_en,
     ingresos_efectivo,
     ingresos_digital,
     gastos,
@@ -520,7 +520,7 @@ const imprimirResumenPorId = async (req, res) => {
     const resumen = r.rows[0];
 
     const archivo = await generarTicketPDF(resumen.tipo, {
-      periodo: resumen.fecha_desde,
+      periodo: new Date(resumen.fecha_desde).toLocaleString("es-AR"),
       efectivo: resumen.ingresos_efectivo,
       digital: resumen.ingresos_digital,
       gastos: resumen.gastos,
