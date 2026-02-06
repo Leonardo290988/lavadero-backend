@@ -11,6 +11,7 @@ function generarTicketOrden({
   telefono,
   items,
   subtotal,
+  promoDescuento,
   senia,
   total,
   tiene_envio
