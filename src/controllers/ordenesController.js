@@ -64,13 +64,16 @@ const crearOrden = async (req, res) => {
     const caja_id = cajaResult.rows[0].id;
 
     // 1️⃣ Crear orden
+    const fechaIngresoFinal = fecha_ingreso || new Date();
+const fechaRetiroFinal = fecha_retiro || null;
+
     const result = await client.query(`
       INSERT INTO ordenes 
       (cliente_id, estado, fecha_ingreso, fecha_retiro, senia)
       VALUES ($1,$2,$3,$4,$5)
       RETURNING *
     `,
-      [cliente_id, estado, fecha_ingreso, fecha_retiro, senia]
+      [cliente_id, estado, fechaIngresoFinal, fechaRetiroFinal, senia]
     );
 
     const orden = result.rows[0];
