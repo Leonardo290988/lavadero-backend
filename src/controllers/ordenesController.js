@@ -42,7 +42,8 @@ const crearOrden = async (req, res) => {
       estado,
       fecha_ingreso,
       fecha_retiro,
-      senia = 0
+      senia = 0,
+      usuario_id
     } = req.body;
 
 
@@ -69,11 +70,11 @@ const fechaRetiroFinal = fecha_retiro || null;
 
     const result = await client.query(`
       INSERT INTO ordenes 
-      (cliente_id, estado, fecha_ingreso, fecha_retiro, senia)
-      VALUES ($1,$2,$3,$4,$5)
+      (cliente_id, estado, fecha_ingreso, fecha_retiro, senia, uisuario_id)
+      VALUES ($1,$2,$3,$4,$5,$6)
       RETURNING *
     `,
-      [cliente_id, estado, fechaIngresoFinal, fechaRetiroFinal, senia]
+      [cliente_id, estado, fechaIngresoFinal, fechaRetiroFinal, senia, usuario_id]
     );
 
     const orden = result.rows[0];
@@ -398,15 +399,17 @@ const getDetalleOrden = async (req, res) => {
         o.senia,
         o.total,
         c.nombre AS cliente,
+        u.nombre AS usuario,
         s.nombre AS servicio,
         os.cantidad,
         os.precio_unitario,
         (os.cantidad * os.precio_unitario) AS subtotal
       FROM ordenes o
-      JOIN clientes c ON c.id = o.cliente_id
-      LEFT JOIN orden_servicios os ON os.orden_id = o.id
-      LEFT JOIN servicios s ON s.id = os.servicio_id
-      WHERE o.id = $1
+JOIN clientes c ON c.id = o.cliente_id
+LEFT JOIN usuarios u ON u.id = o.usuario_id
+LEFT JOIN orden_servicios os ON os.orden_id = o.id
+LEFT JOIN servicios s ON s.id = os.servicio_id
+WHERE o.id = $1
     `, [id]);
 
     if (result.rows.length === 0) {
@@ -419,6 +422,7 @@ const getDetalleOrden = async (req, res) => {
     const detalle = {
       orden_id: base.orden_id,
       cliente: base.cliente,
+      usuario: base.usuario,
       estado: base.estado,
       fecha_ingreso: base.fecha_ingreso,
       fecha_retiro: base.fecha_retiro,
