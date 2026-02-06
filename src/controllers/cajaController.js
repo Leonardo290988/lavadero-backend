@@ -134,7 +134,9 @@ try {
 );
 
   const caja = await pool.query(
-   ` SELECT inicio_caja FROM turnos_caja WHERE id=$1`,
+   ` SELECT fecha, turno, inicio_caja 
+     FROM turnos_caja 
+     WHERE id=$1`,
     [caja_id]
   );
 
@@ -147,6 +149,8 @@ try {
   const efectivo_final = inicio + ingresosEf - gastos - guardado;
 
   res.json({
+  fecha: caja.rows[0].fecha,
+  turno: caja.rows[0].turno,
   ingresos_efectivo: ingresosEf,
   transferencias: transfer,
   gastos,
@@ -478,6 +482,64 @@ const getUltimoCierre = async (req,res)=>{
     monto: r.rows[0].monto_cierre
   });
 };
+
+// GET /caja/turnos
+const getTurnos = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, fecha, turno
+      FROM turnos_caja
+      ORDER BY id DESC
+    `);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error obteniendo turnos" });
+  }
+};
+
+// ======================================
+// GENERAR PDF DESDE RESUMEN GUARDADO
+// ======================================
+const imprimirResumenPorId = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+
+    const r = await pool.query(`
+      SELECT *
+      FROM resumenes
+      WHERE id = $1
+    `, [id]);
+
+    if (r.rows.length === 0) {
+      return res.status(404).json({ error: "Resumen no encontrado" });
+    }
+
+    const resumen = r.rows[0];
+
+    const archivo = await generarTicketPDF(resumen.tipo, {
+      periodo: resumen.fecha_desde,
+      efectivo: resumen.ingresos_efectivo,
+      digital: resumen.ingresos_digital,
+      gastos: resumen.gastos,
+      guardado: resumen.guardado,
+      total: resumen.total_ventas,
+      caja: resumen.caja_final
+    });
+
+    res.json({
+      pdf: `/caja/pdf/${resumen.tipo}/${archivo}`
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error imprimiendo resumen" });
+  }
+};
+
+
     
 module.exports = {
   abrirCaja,
@@ -487,6 +549,7 @@ module.exports = {
   cerrarCaja,
   getResumenTurno,
   imprimirPDFResumen,
+  getTurnos,
   getResumenesDiarios,
   getResumenesSemanales,
   getResumenesMensuales
