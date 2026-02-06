@@ -4,39 +4,47 @@ const PDFDocument = require("pdfkit");
 
 const generarTicketPDF = async (tipo, datos) => {
 
-  const carpeta = path.join(__dirname, "..", "pdf", tipo);
+  // 📁 Carpeta donde se guardan PDFs
+  const carpeta = path.join(process.cwd(), "src", "pdf", tipo);
 
   if (!fs.existsSync(carpeta)) {
     fs.mkdirSync(carpeta, { recursive: true });
   }
 
-  const archivo = `resumen_${tipo}.pdf`;
+  // 🧾 Nombre del archivo
+  const archivo = `resumen_${tipo}_${Date.now()}.pdf`;
+
+  // 📍 Ruta completa solo para guardar
   const rutaArchivo = path.join(carpeta, archivo);
 
   return new Promise((resolve, reject) => {
 
     const doc = new PDFDocument({
-      size: [226, 600],   // 80mm ticket
+      size: [226, 600],
       margin: 10
     });
 
     const stream = fs.createWriteStream(rutaArchivo);
     doc.pipe(stream);
 
-    doc.fontSize(16).text(`Resumen ${tipo}`, { align: "center" });
+    // =============================
+    // CONTENIDO PDF
+    // =============================
+    doc.fontSize(16).text(`Resumen ${tipo.toUpperCase()}`, { align: "center" });
     doc.moveDown();
 
     if (datos.periodo) {
-      doc.fontSize(12).text(`Periodo: ${datos.periodo}`);
+      doc.fontSize(11).text(`Periodo: ${datos.periodo}`);
+      doc.moveDown(0.5);
     }
 
-    doc.text(`Efectivo: $${datos.efectivo}`);
+    doc.fontSize(12).text(`Efectivo: $${datos.efectivo}`);
     doc.text(`Digital: $${datos.digital}`);
     doc.text(`Gastos: $${datos.gastos}`);
     doc.text(`Guardado: $${datos.guardado}`);
-    doc.moveDown();
 
-    doc.fontSize(14).text(`TOTAL VENTAS: $${datos.total}`);
+    doc.moveDown();
+    doc.fontSize(13).text(`TOTAL VENTAS: $${datos.total}`);
     doc.text(`CAJA FINAL: $${datos.caja}`);
 
     doc.moveDown();
@@ -45,7 +53,8 @@ const generarTicketPDF = async (tipo, datos) => {
 
     doc.end();
 
-    stream.on("finish", () => resolve(rutaArchivo));
+    // ✅ DEVOLVER SOLO NOMBRE
+    stream.on("finish", () => resolve(archivo));
     stream.on("error", reject);
 
   });
