@@ -1,15 +1,11 @@
-import fs from "fs";
-import path from "path";
-import PDFDocument from "pdfkit";
+const fs = require("fs");
+const path = require("path");
+const PDFDocument = require("pdfkit");
 
-import { fileURLToPath } from "url";
+const carpeta = path.join(__dirname, "../pdf/retiros");
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+  function generarTicketRetiro({ id, cliente, items, total }) {
 
-export default function generarTicketRetiro({ id, cliente, items, total }) {
-
-  const carpeta = path.join(__dirname, "../pdf/retiros");
 
   if (!fs.existsSync(carpeta)) {
     fs.mkdirSync(carpeta, { recursive: true });
@@ -48,3 +44,4 @@ export default function generarTicketRetiro({ id, cliente, items, total }) {
   doc.end();
   return archivo;
 }
+module.exports = generarTicketRetiro;

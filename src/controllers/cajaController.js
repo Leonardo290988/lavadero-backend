@@ -1,10 +1,10 @@
-import pool from "../db.js";
-import path from "path";
-import generarTicketPDF from "../utils/generarTicketPDF.js";
-import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+
+
+const pool = require("../db");
+const path = require("path");
+const generarTicketPDF = require("../utils/generarTicketPDF");
+
 
 // ======================================
 // ABRIR CAJA
@@ -479,7 +479,7 @@ const getUltimoCierre = async (req,res)=>{
   });
 };
     
-export {
+module.exports = {
   abrirCaja,
   getCajaActual,
   registrarMovimiento,

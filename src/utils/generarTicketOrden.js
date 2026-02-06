@@ -1,14 +1,10 @@
-import fs from "fs";
-import path from "path";
-import PDFDocument from "pdfkit";
-import { fileURLToPath } from "url";
+const fs = require("fs");
+const path = require("path");
+const PDFDocument = require("pdfkit");
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const carpeta = path.join(__dirname, "../pdf/ordenes");
 
-export default function generarTicketOrden(orden) {
-
-  const carpeta = path.join(__dirname, "../pdf/ordenes");
+function generarTicketOrden(orden) {
 
   if (!fs.existsSync(carpeta)) {
     fs.mkdirSync(carpeta, { recursive: true });
@@ -62,3 +58,4 @@ export default function generarTicketOrden(orden) {
 
   return archivo;
 }
+module.exports = generarTicketOrden;

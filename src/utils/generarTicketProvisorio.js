@@ -1,15 +1,13 @@
-import fs from "fs";
-import path from "path";
-import PDFDocument from "pdfkit";
+const fs = require("fs");
+const path = require("path");
+const PDFDocument = require("pdfkit");
 
-import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const carpeta = path.join(__dirname, "../pdf/provisorios");
 
-export default function generarTicketProvisorio(orden) {
+function generarTicketProvisorio(orden) {
 
-  const carpeta = path.join(__dirname, "../pdf/provisorios");
+  
 
   if (!fs.existsSync(carpeta)) {
     fs.mkdirSync(carpeta, { recursive: true });
@@ -28,7 +26,7 @@ export default function generarTicketProvisorio(orden) {
   doc.fontSize(12);
   doc.text(`Orden: ${orden.id}`);
   doc.text(`Cliente: ${orden.cliente}`);
-  doc.text(`Fecha: ${fechaArgentina()}`);
+  doc.text(`Fecha: ${new Date().toLocaleString("es-AR")}`);
 
   doc.moveDown();
   doc.text("------------------------");
@@ -45,3 +43,4 @@ export default function generarTicketProvisorio(orden) {
   doc.end();
   return archivo;
 }
+module.exports = generarTicketProvisorio;
