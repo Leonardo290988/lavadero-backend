@@ -5,7 +5,7 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 const path = require("path");
-import usuariosRoutes from "./routes/usuarios.js";
+const usuariosRoutes = require("./routes/usuarios");
 
 app.use("/pdf", express.static(path.join(__dirname, "pdf")));
 
