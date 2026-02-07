@@ -64,7 +64,7 @@ const crearOrden = async (req, res) => {
     const caja_id = cajaResult.rows[0].id;
 
     // 1️⃣ Crear orden
-const fechaIngresoFinal = fecha_ingreso || null;
+
 const fechaRetiroFinal = fecha_retiro || null;
 
     const result = await client.query(`
@@ -73,7 +73,7 @@ const fechaRetiroFinal = fecha_retiro || null;
       VALUES ($1,$2,NOW(),$3,$4,$5)
       RETURNING *
     `,
-      [cliente_id, estado, fechaIngresoFinal, fechaRetiroFinal, senia, usuario_id]
+      [cliente_id, estado, fechaRetiroFinal, senia, usuario_id]
     );
 
     const orden = result.rows[0];
