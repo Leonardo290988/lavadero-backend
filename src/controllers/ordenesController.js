@@ -13,8 +13,8 @@ const getOrdenes = async (req, res) => {
         o.cliente_id,
         c.nombre AS cliente,
         o.estado,
-        o.fecha_ingreso AT TIME ZONE 'America/Argentina/Buenos_Aires' AS fecha_ingreso,
-        o.fecha_retiro AT TIME ZONE 'America/Argentina/Buenos_Aires' AS fecha_retiro,
+        o.fecha_ingreso  AS fecha_ingreso,
+        o.fecha_retiro  AS fecha_retiro,
         o.senia
       FROM ordenes o
       JOIN clientes c ON c.id = o.cliente_id
@@ -40,7 +40,6 @@ const crearOrden = async (req, res) => {
     const {
       cliente_id,
       estado,
-      fecha_ingreso,
       fecha_retiro,
       senia = 0,
       usuario_id
@@ -71,7 +70,7 @@ const fechaRetiroFinal = fecha_retiro || null;
     const result = await client.query(`
       INSERT INTO ordenes 
       (cliente_id, estado, fecha_ingreso, fecha_retiro, senia, usuario_id)
-      VALUES ($1,$2, COALESCE($3, NOW()),$4,$5,$6)
+      VALUES ($1,$2,NOW(),$3,$4,$5)
       RETURNING *
     `,
       [cliente_id, estado, fechaIngresoFinal, fechaRetiroFinal, senia, usuario_id]
@@ -394,8 +393,8 @@ const getDetalleOrden = async (req, res) => {
       SELECT
         o.id AS orden_id,
         o.estado,
-        o.fecha_ingreso AT TIME ZONE 'America/Argentina/Buenos_Aires' AS fecha_ingreso,
-        o.fecha_retiro AT TIME ZONE 'America/Argentina/Buenos_Aires'AS fecha_retiro,
+        o.fecha_ingreso  AS fecha_ingreso,
+        o.fecha_retiro AS fecha_retiro,
         o.senia,
         o.total,
         c.nombre AS cliente,
