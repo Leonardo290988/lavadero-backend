@@ -65,7 +65,7 @@ const crearOrden = async (req, res) => {
     const caja_id = cajaResult.rows[0].id;
 
     // 1️⃣ Crear orden
-    const fechaIngresoFinal = fecha_ingreso || new Date();
+const fechaIngresoFinal = fecha_ingreso || new Date().toLocaleString("sv-SE");
 const fechaRetiroFinal = fecha_retiro || null;
 
     const result = await client.query(`
