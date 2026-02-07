@@ -394,8 +394,8 @@ const getDetalleOrden = async (req, res) => {
       SELECT
         o.id AS orden_id,
         o.estado,
-        o.fecha_ingreso  AS fecha_ingreso,
-        o.fecha_retiro AS fecha_retiro,
+        o.fecha_ingreso AT TIME ZONE 'America/Argentina/Buenos_Aires' AS fecha_ingreso,
+        o.fecha_retiro AT TIME ZONE 'America/Argentina/Buenos_Aires'AS fecha_retiro,
         o.senia,
         o.total,
         c.nombre AS cliente,
