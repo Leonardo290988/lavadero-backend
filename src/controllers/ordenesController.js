@@ -393,29 +393,29 @@ const getDetalleOrden = async (req, res) => {
       SELECT
         o.id AS orden_id,
         o.estado,
-       o.fecha_ingreso ,
-       o.fecha_retiro ,
+        o.fecha_ingreso,
+        o.fecha_retiro,
         o.senia,
         o.total,
         c.nombre AS cliente,
         u.nombre AS usuario,
+        os.id AS orden_servicio_id,
         s.nombre AS servicio,
         os.cantidad,
         os.precio_unitario,
         (os.cantidad * os.precio_unitario) AS subtotal
       FROM ordenes o
-JOIN clientes c ON c.id = o.cliente_id
-LEFT JOIN usuarios u ON u.id = o.usuario_id
-LEFT JOIN orden_servicios os ON os.orden_id = o.id
-LEFT JOIN servicios s ON s.id = os.servicio_id
-WHERE o.id = $1
+      JOIN clientes c ON c.id = o.cliente_id
+      LEFT JOIN usuarios u ON u.id = o.usuario_id
+      LEFT JOIN orden_servicios os ON os.orden_id = o.id
+      LEFT JOIN servicios s ON s.id = os.servicio_id
+      WHERE o.id = $1
     `, [id]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Orden no encontrada' });
     }
 
-    // Armamos estructura limpia para el frontend
     const base = result.rows[0];
 
     const detalle = {
@@ -430,6 +430,7 @@ WHERE o.id = $1
       servicios: result.rows
         .filter(r => r.servicio)
         .map(r => ({
+          orden_servicio_id: r.orden_servicio_id, // ✅ CLAVE
           nombre: r.servicio,
           cantidad: r.cantidad,
           precio_unitario: r.precio_unitario,
@@ -442,7 +443,6 @@ WHERE o.id = $1
   } catch (error) {
     console.error('❌ ERROR DETALLE ORDEN:', error.message);
     res.status(500).json({ error: 'Error al obtener detalle de la orden' });
-  
   }
 };
 
