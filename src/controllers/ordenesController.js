@@ -393,10 +393,7 @@ const getDetalleOrden = async (req, res) => {
       SELECT
         o.id AS orden_id,
         o.estado,
-       to_char(
-  o.fecha_ingreso AT TIME ZONE 'America/Argentina/Buenos_Aires',
-  'DD/MM/YYYY HH24:MI:SS'
-) AS fecha_ingreso,
+       o.fecha_ingreso ,
        o.fecha_retiro ,
         o.senia,
         o.total,
