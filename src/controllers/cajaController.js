@@ -134,7 +134,11 @@ try {
 );
 
   const caja = await pool.query(
-   ` SELECT fecha, turno, inicio_caja 
+   ` SELECT 
+   to_char(
+  fecha AT TIME ZONE 'America/Argentina/Buenos_Aires',
+  'DD/MM/YYYY HH24:MI:SS'
+)AS fecha, turno, inicio_caja 
      FROM turnos_caja 
      WHERE id=$1`,
     [caja_id]
@@ -184,7 +188,10 @@ const cerrarCaja = async (req, res) => {
     `,[cajaId]);
 
     const caja = await pool.query(
-      `SELECT inicio_caja, fecha, turno, creado_en FROM turnos_caja WHERE id=$1`,
+      `SELECT inicio_caja, fecha, turno, to_char(
+  creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires',
+  'DD/MM/YYYY HH24:MI:SS'
+)AS creado_en FROM turnos_caja WHERE id=$1`,
       [cajaId]
     );
 
@@ -413,7 +420,10 @@ const getResumenesDiarios = async (req,res)=>{
   SELECT 
     id,
     fecha_desde,
-    creado_en,
+    to_char(
+  creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires',
+  'DD/MM/YYYY HH24:MI:SS'
+)AS creado_en,
     ingresos_efectivo,
     ingresos_digital,
     gastos,
@@ -432,7 +442,10 @@ const getResumenesSemanales = async (req,res)=>{
   SELECT 
     id,
     fecha_desde,
-    creado_en,
+    to_char(
+  creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires',
+  'DD/MM/YYYY HH24:MI:SS'
+)AS creado_en,
     ingresos_efectivo,
     ingresos_digital,
     gastos,
@@ -451,7 +464,10 @@ const getResumenesMensuales = async (req,res)=>{
   SELECT 
     id,
     fecha_desde,
-    creado_en ,
+   to_char(
+  creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires',
+  'DD/MM/YYYY HH24:MI:SS'
+)AS creado_en  ,
     ingresos_efectivo,
     ingresos_digital,
     gastos,
