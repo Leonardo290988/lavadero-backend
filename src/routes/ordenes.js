@@ -4,6 +4,7 @@ const router = express.Router();
 const {
   getRetirosHoy,
   getRetiros,
+  eliminarServicioDeOrden,
   getServiciosDeOrden, 
   getServiciosOrden,
   confirmarOrden,
@@ -42,4 +43,5 @@ router.put('/:id/senia', actualizarSenia);
 router.put('/:id/cerrar', cerrarOrden);
 router.post('/:id/servicios', agregarServicioAOrden);
 router.get('/:id/servicios', getServiciosDeOrden);
+router.delete("/servicios/:id", eliminarServicioDeOrden);
 module.exports = router;
