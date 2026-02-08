@@ -13,14 +13,8 @@ const getOrdenes = async (req, res) => {
         o.cliente_id,
         c.nombre AS cliente,
         o.estado,
-        to_char(
-  o.fecha_ingreso AT TIME ZONE 'America/Argentina/Buenos_Aires',
-  'DD/MM/YYYY HH24:MI:SS'
-)AS fecha_ingreso,
-        to_char(
-  o.fecha_retiro AT TIME ZONE 'America/Argentina/Buenos_Aires',
-  'DD/MM/YYYY HH24:MI:SS'
-)AS fecha_retiro,
+       o.fecha_ingreso,
+       o.fecha_retiro,
         o.senia
       FROM ordenes o
       JOIN clientes c ON c.id = o.cliente_id
@@ -188,10 +182,7 @@ const getOrdenesAbiertas = async (req, res) => {
     const ordenesResult = await pool.query(`
       SELECT
         o.id,
-        to_char(
-  o.fecha_ingreso AT TIME ZONE 'America/Argentina/Buenos_Aires',
-  'DD/MM/YYYY HH24:MI:SS'
-) AS fecha_ingreso,
+  o.fecha_ingreso ,
         o.estado,
         o.senia,
         c.nombre AS cliente,
@@ -376,10 +367,7 @@ const getOrdenesListasParaRetiro = async (req, res) => {
       SELECT
         o.id,
         c.nombre AS cliente,
-        to_char(
-  o.fecha_ingreso AT TIME ZONE 'America/Argentina/Buenos_Aires',
-  'DD/MM/YYYY HH24:MI:SS'
-)AS fecha_ingreso,
+        o.fecha_ingreso,
         o.total,
         o.senia,
         (o.total - COALESCE(o.senia,0)) AS total_a_pagar
@@ -405,14 +393,8 @@ const getDetalleOrden = async (req, res) => {
       SELECT
         o.id AS orden_id,
         o.estado,
-        to_char(
-  o.fecha_ingreso AT TIME ZONE 'America/Argentina/Buenos_Aires',
-  'DD/MM/YYYY HH24:MI:SS'
-)AS fecha_ingreso,
-        to_char(
-  o.fecha_retiro AT TIME ZONE 'America/Argentina/Buenos_Aires',
-  'DD/MM/YYYY HH24:MI:SS'
-)AS fecha_retiro,
+        o.fecha_ingreso,
+       o.fecha_retiro ,
         o.senia,
         o.total,
         c.nombre AS cliente,
