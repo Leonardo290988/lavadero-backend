@@ -70,7 +70,7 @@ const fechaRetiroFinal = fecha_retiro || null;
     const result = await client.query(`
       INSERT INTO ordenes 
       (cliente_id, estado, fecha_ingreso, fecha_retiro, senia, usuario_id)
-      VALUES ($1,$2,NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires' ,$3,$4,$5)
+      VALUES ($1,$2,NOW(),$3,$4,$5)
       RETURNING *
     `,
       [cliente_id, estado, fechaRetiroFinal, senia, usuario_id]
