@@ -76,7 +76,7 @@ const fechaRetiroFinal = fecha_retiro || null;
     const result = await client.query(`
       INSERT INTO ordenes 
       (cliente_id, estado, fecha_ingreso, fecha_retiro, senia, usuario_id)
-      VALUES ($1,$2,NOW(),$3,$4,$5)
+      VALUES ($1,$2,(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'),$3,$4,$5)
       RETURNING *
     `,
       [cliente_id, estado, fechaRetiroFinal, senia, usuario_id]
@@ -543,7 +543,7 @@ WHERE o.id=$1
     await client.query(`
       UPDATE ordenes
       SET estado='retirada',
-          fecha_retiro = NOW(),
+          fecha_retiro = (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'),
           usuario_retiro_id = $2
       WHERE id=$1
     `,[id, usuario_id]);
@@ -552,7 +552,7 @@ WHERE o.id=$1
       await client.query(`
         INSERT INTO caja_movimientos
         (caja_id,tipo,descripcion,monto,forma_pago,creado_en)
-        VALUES ($1,'ingreso',$2,$3,$4,NOW())
+        VALUES ($1,'ingreso',$2,$3,$4,(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'))
       `,[
         caja.rows[0].id,
         'Retiro orden #' + id,
