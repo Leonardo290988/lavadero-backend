@@ -229,31 +229,38 @@ const cerrarCaja = async (req, res) => {
       efectivoFinal
     ]);
 
-    await generarTicketPDF("turno", {
-      periodo: `${caja.rows[0].fecha} ${caja.rows[0].turno} ${new Date().toLocaleTimeString("es-AR")}`,
-      efectivo: ingresos,
-      digital,
-      gastos,
-      guardado,
-      total: totalVentas,
-      caja: efectivoFinal
-    });
+    const archivoTurno = await generarTicketPDF("turno", {
+  periodo: `${caja.rows[0].fecha} ${caja.rows[0].turno}`,
+  efectivo: ingresos,
+  digital,
+  gastos,
+  guardado,
+  total: totalVentas,
+  caja: efectivoFinal
+});
 
     // ========= DIARIO =========
     if (caja.rows[0].turno === "tarde") {
 
       const diarios = await pool.query(`
-        SELECT
-          COALESCE(SUM(ingresos_efectivo),0) efectivo,
-          COALESCE(SUM(ingresos_digital),0) digital,
-          COALESCE(SUM(gastos),0) gastos,
-          COALESCE(SUM(guardado),0) guardado,
-          COALESCE(SUM(total_ventas),0) total,
-          COALESCE(SUM(caja_final),0) caja
-        FROM resumenes
-        WHERE tipo='turno'
-        AND fecha_desde=$1
-      `,[caja.rows[0].fecha]);
+  SELECT
+    COALESCE(SUM(ingresos_efectivo),0) efectivo,
+    COALESCE(SUM(ingresos_digital),0) digital,
+    COALESCE(SUM(gastos),0) gastos,
+    COALESCE(SUM(guardado),0) guardado,
+    COALESCE(SUM(total_ventas),0) total,
+    (
+      SELECT caja_final
+      FROM resumenes
+      WHERE tipo='turno'
+        AND fecha_desde = $1
+      ORDER BY id DESC
+      LIMIT 1
+    ) AS caja
+  FROM resumenes
+  WHERE tipo='turno'
+    AND fecha_desde = $1
+`, [caja.rows[0].fecha]);
 
       const d = diarios.rows[0];
 
@@ -291,18 +298,26 @@ const cerrarCaja = async (req, res) => {
     if (fechaCaja.getDay() === 6) {
 
       const semanal = await pool.query(`
-        SELECT
-          COALESCE(SUM(ingresos_efectivo),0) efectivo,
-          COALESCE(SUM(ingresos_digital),0) digital,
-          COALESCE(SUM(gastos),0) gastos,
-          COALESCE(SUM(guardado),0) guardado,
-          COALESCE(SUM(total_ventas),0) total,
-          COALESCE(SUM(caja_final),0) caja
-        FROM resumenes
-        WHERE tipo='diario'
+  SELECT
+    COALESCE(SUM(ingresos_efectivo),0) efectivo,
+    COALESCE(SUM(ingresos_digital),0) digital,
+    COALESCE(SUM(gastos),0) gastos,
+    COALESCE(SUM(guardado),0) guardado,
+    COALESCE(SUM(total_ventas),0) total,
+    (
+      SELECT caja_final
+      FROM resumenes
+      WHERE tipo='diario'
         AND fecha_desde BETWEEN
-        DATE_TRUNC('week',$1::date) AND $1::date
-      `,[caja.rows[0].fecha]);
+          DATE_TRUNC('week',$1::date) AND $1::date
+      ORDER BY fecha_desde DESC, id DESC
+      LIMIT 1
+    ) AS caja
+  FROM resumenes
+  WHERE tipo='diario'
+    AND fecha_desde BETWEEN
+      DATE_TRUNC('week',$1::date) AND $1::date
+`, [caja.rows[0].fecha]);
 
       const s = semanal.rows[0];
 
@@ -344,18 +359,26 @@ const cerrarCaja = async (req, res) => {
     if (fechaCaja.getDate() === ultimoDia) {
 
       const mensual = await pool.query(`
-        SELECT
-          COALESCE(SUM(ingresos_efectivo),0) efectivo,
-          COALESCE(SUM(ingresos_digital),0) digital,
-          COALESCE(SUM(gastos),0) gastos,
-          COALESCE(SUM(guardado),0) guardado,
-          COALESCE(SUM(total_ventas),0) total,
-          COALESCE(SUM(caja_final),0) caja
-        FROM resumenes
-        WHERE tipo='diario'
+  SELECT
+    COALESCE(SUM(ingresos_efectivo),0) efectivo,
+    COALESCE(SUM(ingresos_digital),0) digital,
+    COALESCE(SUM(gastos),0) gastos,
+    COALESCE(SUM(guardado),0) guardado,
+    COALESCE(SUM(total_ventas),0) total,
+    (
+      SELECT caja_final
+      FROM resumenes
+      WHERE tipo='diario'
         AND DATE_TRUNC('month',fecha_desde)
+            = DATE_TRUNC('month',$1::date)
+      ORDER BY fecha_desde DESC, id DESC
+      LIMIT 1
+    ) AS caja
+  FROM resumenes
+  WHERE tipo='diario'
+    AND DATE_TRUNC('month',fecha_desde)
         = DATE_TRUNC('month',$1::date)
-      `,[caja.rows[0].fecha]);
+`, [caja.rows[0].fecha]);
 
       const m = mensual.rows[0];
 
@@ -396,7 +419,11 @@ const cerrarCaja = async (req, res) => {
   WHERE id=$1
 `, [cajaId, efectivoFinal]);
 
-    res.json({ ok:true, efectivoFinal });
+  res.json({
+  ok: true,
+  efectivoFinal,
+  pdf: `/caja/pdf/turno/${archivoTurno}`
+});
 
   } catch (error) {
     console.error("ERROR cerrarCaja:", error);
