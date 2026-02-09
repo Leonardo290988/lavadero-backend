@@ -4,13 +4,16 @@ const getDashboard = async (req, res) => {
   try {
 
     // Caja abierta
-    const cajaResult = await pool.query(`
-      SELECT id, inicio_caja
-      FROM turnos_caja
-      WHERE estado = 'abierta'
-      ORDER BY id DESC
-      LIMIT 1
-    `);
+  const cajaResult = await pool.query(`
+  SELECT id, inicio_caja
+  FROM turnos_caja
+  WHERE estado = 'abierta'
+    AND fecha = (
+      CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires'
+    )::date
+  ORDER BY id DESC
+  LIMIT 1
+`);
 
     const inicioCaja = cajaResult.rows.length
       ? Number(cajaResult.rows[0].inicio_caja)
