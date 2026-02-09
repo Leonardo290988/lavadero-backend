@@ -214,7 +214,7 @@ const cerrarCaja = async (req, res) => {
       INSERT INTO resumenes
       (tipo,fecha_desde,fecha_hasta,turno,
        ingresos_efectivo,ingresos_digital,
-       gastos,guardado,total_ventas,caja_final,ordenes)
+       gastos,guardado,total_ventas,caja_final,ordenes,archivo_pdf)
       VALUES
       ('turno',$1,$1,$2,$3,$4,$5,$6,$7,$8,0)
     `,
@@ -226,10 +226,12 @@ const cerrarCaja = async (req, res) => {
       gastos,
       guardado,
       totalVentas,
-      efectivoFinal
+      efectivoFinal,
+      0,
+     archivoPDF
     ]);
 
-    await generarTicketPDF("turno", {
+    const archivoPDF = await generarTicketPDF("turno", {
   periodo: `${caja.rows[0].fecha} ${caja.rows[0].turno}`,
   efectivo: ingresos,
   digital,
@@ -242,7 +244,7 @@ const cerrarCaja = async (req, res) => {
     // ========= DIARIO =========
     if (caja.rows[0].turno === "tarde") {
 
-      const diarios = await pool.query(`
+     const diarios = await pool.query(`
   SELECT
     COALESCE(SUM(ingresos_efectivo),0) efectivo,
     COALESCE(SUM(ingresos_digital),0) digital,
@@ -309,14 +311,14 @@ const cerrarCaja = async (req, res) => {
       FROM resumenes
       WHERE tipo='diario'
         AND fecha_desde BETWEEN
-          DATE_TRUNC('week',$1::date) AND $1::date
+            DATE_TRUNC('week',$1::date) AND $1::date
       ORDER BY fecha_desde DESC, id DESC
       LIMIT 1
     ) AS caja
   FROM resumenes
   WHERE tipo='diario'
     AND fecha_desde BETWEEN
-      DATE_TRUNC('week',$1::date) AND $1::date
+        DATE_TRUNC('week',$1::date) AND $1::date
 `, [caja.rows[0].fecha]);
 
       const s = semanal.rows[0];
@@ -578,7 +580,7 @@ const imprimirResumenPorId = async (req, res) => {
     });
 
     res.json({
-      pdf: `/caja/pdf/${resumen.tipo}/${archivo}`
+      pdf: `/caja/pdf/${resumen.tipo}/${resumen.archivo_pdf}`
     });
 
   } catch (error) {
