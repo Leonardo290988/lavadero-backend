@@ -4,7 +4,7 @@ const getDashboard = async (req, res) => {
   try {
 
     // ===============================
-    // FECHA ACTUAL ARGENTINA
+    // FECHA ACTUAL EN ARGENTINA
     // ===============================
     const fechaHoyResult = await pool.query(`
       SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date AS hoy
@@ -30,18 +30,19 @@ const getDashboard = async (req, res) => {
     const ingresosDigital = Number(ingresosResult.rows[0].digital);
 
     // ===============================
-    // ÓRDENES DEL DÍA
+    // ÓRDENES DEL DÍA (COBRADAS HOY)
     // ===============================
     const ordenesResult = await pool.query(`
-      SELECT COUNT(*) AS total
-      FROM ordenes
-      WHERE (fecha_ingreso AT TIME ZONE 'America/Argentina/Buenos_Aires')::date = $1
+      SELECT COUNT(DISTINCT descripcion) AS total
+      FROM caja_movimientos
+      WHERE tipo = 'ingreso'
+        AND (creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires')::date = $1
     `, [hoy]);
 
     const ordenesHoy = Number(ordenesResult.rows[0].total);
 
     // ===============================
-    // CAJA ABIERTA (SOLO PARA CAJA ACTUAL)
+    // CAJA ACTUAL (SOLO CAJA ABIERTA)
     // ===============================
     const cajaResult = await pool.query(`
       SELECT id, inicio_caja
@@ -74,7 +75,7 @@ const getDashboard = async (req, res) => {
     }
 
     // ===============================
-    // RESPUESTA
+    // RESPUESTA FINAL
     // ===============================
     res.json({
       cajaActual,
