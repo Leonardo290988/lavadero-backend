@@ -35,7 +35,7 @@ const getDashboard = async (req, res) => {
     const ordenesResult = await pool.query(`
       SELECT COUNT(*) AS total
       FROM ordenes
-      WHERE (fecha_ingreso AT TIME ZONE 'America/Argentina/Buenos_Aires')::date = $1
+      WHERE DATE(fecha_ingreso) = $1
     `, [hoy]);
 
     const ordenesHoy = Number(ordenesResult.rows[0].total);
