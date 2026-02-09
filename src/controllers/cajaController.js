@@ -211,7 +211,8 @@ const cerrarCaja = async (req, res) => {
 
     // ========= TURNO =========
     
-    const archivoPDF = await generarTicketPDF("turno", {
+    // ========= TURNO =========
+const archivoPDF = await generarTicketPDF("turno", {
   periodo: `${caja.rows[0].fecha} ${caja.rows[0].turno}`,
   efectivo: ingresos,
   digital,
@@ -220,26 +221,50 @@ const cerrarCaja = async (req, res) => {
   total: totalVentas,
   caja: efectivoFinal
 });
-    await pool.query(`
-      INSERT INTO resumenes
-      (tipo,fecha_desde,fecha_hasta,turno,
-       ingresos_efectivo,ingresos_digital,
-       gastos,guardado,total_ventas,caja_final,ordenes,archivo_pdf)
-      VALUES
-      ('turno',$1,$1,$2,$3,$4,$5,$6,$7,$8,0)
-    `,
-    [
-      caja.rows[0].fecha,
-      caja.rows[0].turno,
-      ingresos,
-      digital,
-      gastos,
-      guardado,
-      totalVentas,
-      efectivoFinal,
-      0,
-     archivoPDF
-    ]);
+
+await pool.query(`
+  INSERT INTO resumenes
+  (
+    tipo,
+    fecha_desde,
+    fecha_hasta,
+    turno,
+    ingresos_efectivo,
+    ingresos_digital,
+    gastos,
+    guardado,
+    total_ventas,
+    caja_final,
+    ordenes,
+    archivo_pdf
+  )
+  VALUES
+  (
+    'turno',
+    $1,
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    0,
+    $9
+  )
+`,
+[
+  caja.rows[0].fecha, // $1
+  caja.rows[0].turno, // $2
+  ingresos,           // $3
+  digital,            // $4
+  gastos,             // $5
+  guardado,           // $6
+  totalVentas,        // $7
+  efectivoFinal,      // $8
+  archivoPDF          // $9
+]);
 
 
     // ========= DIARIO =========
