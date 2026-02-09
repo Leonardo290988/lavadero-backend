@@ -8,9 +8,6 @@ const getDashboard = async (req, res) => {
   SELECT id, inicio_caja
   FROM turnos_caja
   WHERE estado = 'abierta'
-    AND fecha = (
-      CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires'
-    )::date
   ORDER BY id DESC
   LIMIT 1
 `);
