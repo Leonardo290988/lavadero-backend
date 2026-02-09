@@ -290,7 +290,6 @@ const cerrarOrden = async (req, res) => {
     let acolchados = [];
 
     for (const s of serviciosResult.rows) {
-
       if (s.nombre.toLowerCase().includes('acolchado')) {
         for (let i = 0; i < s.cantidad; i++) {
           acolchados.push(Number(s.precio_unitario));
@@ -326,22 +325,48 @@ const cerrarOrden = async (req, res) => {
     // 🚚 VINCULAR ENVÍO PREPAGO
     // ===============================
     if (ordenResult.rows[0].tiene_envio === true) {
-
       await pool.query(`
-  UPDATE envios
-  SET orden_id = $1
-  WHERE id = (
-    SELECT id
-    FROM envios
-    WHERE cliente_id = $2
-      AND estado = 'pendiente'
-      AND orden_id IS NULL
-    ORDER BY id DESC
-    LIMIT 1
-  )
-`, [id, ordenResult.rows[0].cliente_id]);
+        UPDATE envios
+        SET orden_id = $1
+        WHERE id = (
+          SELECT id
+          FROM envios
+          WHERE cliente_id = $2
+            AND estado = 'pendiente'
+            AND orden_id IS NULL
+          ORDER BY id DESC
+          LIMIT 1
+        )
+      `, [id, ordenResult.rows[0].cliente_id]);
 
       console.log("🚚 Envío vinculado a la orden");
+    }
+
+    // ===============================
+    // 📲 WHATSAPP AL CERRAR ORDEN
+    // ===============================
+    const clienteResult = await pool.query(`
+      SELECT nombre, telefono
+      FROM clientes
+      WHERE id = $1
+    `, [ordenResult.rows[0].cliente_id]);
+
+    let whatsapp_url = null;
+
+    if (clienteResult.rows.length > 0 && clienteResult.rows[0].telefono) {
+      const cliente = clienteResult.rows[0];
+      const telefono = cliente.telefono.replace(/\D/g, "");
+
+      const mensaje = `
+Hola ${cliente.nombre} 👋
+Tu orden Nº ${id} de Lavaderos Moreno ya está lista ✅
+
+🧺 Total: $${total}
+
+¡Te esperamos!
+      `.trim();
+
+      whatsapp_url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
     }
 
     // ===============================
@@ -351,7 +376,8 @@ const cerrarOrden = async (req, res) => {
       orden_id: id,
       total,
       senia: ordenResult.rows[0].senia,
-      estado: 'lista'
+      estado: 'lista',
+      whatsapp_url
     });
 
   } catch (error) {
