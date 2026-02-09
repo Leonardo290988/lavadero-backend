@@ -210,6 +210,16 @@ const cerrarCaja = async (req, res) => {
     const totalVentas = ingresos + digital;
 
     // ========= TURNO =========
+    
+    const archivoPDF = await generarTicketPDF("turno", {
+  periodo: `${caja.rows[0].fecha} ${caja.rows[0].turno}`,
+  efectivo: ingresos,
+  digital,
+  gastos,
+  guardado,
+  total: totalVentas,
+  caja: efectivoFinal
+});
     await pool.query(`
       INSERT INTO resumenes
       (tipo,fecha_desde,fecha_hasta,turno,
@@ -231,15 +241,6 @@ const cerrarCaja = async (req, res) => {
      archivoPDF
     ]);
 
-    const archivoPDF = await generarTicketPDF("turno", {
-  periodo: `${caja.rows[0].fecha} ${caja.rows[0].turno}`,
-  efectivo: ingresos,
-  digital,
-  gastos,
-  guardado,
-  total: totalVentas,
-  caja: efectivoFinal
-});
 
     // ========= DIARIO =========
     if (caja.rows[0].turno === "tarde") {
@@ -424,7 +425,7 @@ const cerrarCaja = async (req, res) => {
   res.json({
   ok: true,
   efectivoFinal,
-  pdf: `/caja/pdf/turno/${archivoTurno}`
+  pdf: `/caja/pdf/turno/${archivoPDF}`
 });
 
   } catch (error) {
