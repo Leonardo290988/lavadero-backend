@@ -17,43 +17,55 @@ const getDashboard = async (req, res) => {
       : 0;
 
     // INGRESOS TOTALES HOY
-    const ingresosResult = await pool.query(`
-      SELECT COALESCE(SUM(monto),0) AS total
-      FROM caja_movimientos
-      WHERE tipo = 'ingreso'
-        AND DATE(creado_en) = CURRENT_DATE
-    `);
+   const ingresosResult = await pool.query(`
+  SELECT COALESCE(SUM(monto),0) AS total
+  FROM caja_movimientos
+  WHERE tipo = 'ingreso'
+    AND
+      (creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
+      =
+      (CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
+`);
 
     const ingresosDia = Number(ingresosResult.rows[0].total);
 
     // INGRESOS EFECTIVO
-    const efectivoResult = await pool.query(`
-      SELECT COALESCE(SUM(monto),0) AS total
-      FROM caja_movimientos
-      WHERE tipo = 'ingreso'
-        AND forma_pago = 'Efectivo'
-        AND DATE(creado_en) = CURRENT_DATE
-    `);
+     const efectivoResult = await pool.query(`
+  SELECT COALESCE(SUM(monto),0) AS total
+  FROM caja_movimientos
+  WHERE tipo = 'ingreso'
+    AND forma_pago = 'Efectivo'
+    AND
+      (creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
+      =
+      (CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
+`);
 
     const ingresosEfectivo = Number(efectivoResult.rows[0].total);
 
     // INGRESOS DIGITALES
-    const digitalResult = await pool.query(`
-      SELECT COALESCE(SUM(monto),0) AS total
-      FROM caja_movimientos
-      WHERE tipo = 'ingreso'
-        AND forma_pago != 'Efectivo'
-        AND DATE(creado_en) = CURRENT_DATE
-    `);
+   const digitalResult = await pool.query(`
+  SELECT COALESCE(SUM(monto),0) AS total
+  FROM caja_movimientos
+  WHERE tipo = 'ingreso'
+    AND forma_pago != 'Efectivo'
+    AND
+      (creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
+      =
+      (CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
+`);
 
     const ingresosDigital = Number(digitalResult.rows[0].total);
 
     // ORDENES HOY
     const ordenesResult = await pool.query(`
-      SELECT COUNT(*) AS total
-      FROM ordenes
-      WHERE DATE(fecha_ingreso) = CURRENT_DATE
-    `);
+  SELECT COUNT(*) AS total
+  FROM ordenes
+  WHERE
+    (fecha_ingreso AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
+    =
+    (CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
+`);
 
     const ordenesHoy = Number(ordenesResult.rows[0].total);
 
