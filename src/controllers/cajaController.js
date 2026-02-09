@@ -229,7 +229,7 @@ const cerrarCaja = async (req, res) => {
       efectivoFinal
     ]);
 
-    const archivoTurno = await generarTicketPDF("turno", {
+    await generarTicketPDF("turno", {
   periodo: `${caja.rows[0].fecha} ${caja.rows[0].turno}`,
   efectivo: ingresos,
   digital,
