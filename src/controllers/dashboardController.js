@@ -21,10 +21,7 @@ const getDashboard = async (req, res) => {
   SELECT COALESCE(SUM(monto),0) AS total
   FROM caja_movimientos
   WHERE tipo = 'ingreso'
-    AND
-      (creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
-      =
-      (CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
+    AND DATE(creado_en) = CURRENT_DATE
 `);
 
     const ingresosDia = Number(ingresosResult.rows[0].total);
@@ -35,10 +32,7 @@ const getDashboard = async (req, res) => {
   FROM caja_movimientos
   WHERE tipo = 'ingreso'
     AND forma_pago = 'Efectivo'
-    AND
-      (creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
-      =
-      (CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
+   AND DATE(creado_en) = CURRENT_DATE
 `);
 
     const ingresosEfectivo = Number(efectivoResult.rows[0].total);
@@ -49,10 +43,7 @@ const getDashboard = async (req, res) => {
   FROM caja_movimientos
   WHERE tipo = 'ingreso'
     AND forma_pago != 'Efectivo'
-    AND
-      (creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
-      =
-      (CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
+    AND DATE(creado_en) = CURRENT_DATE
 `);
 
     const ingresosDigital = Number(digitalResult.rows[0].total);
