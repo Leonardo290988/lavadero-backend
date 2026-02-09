@@ -555,13 +555,15 @@ const getTurnos = async (req, res) => {
 const imprimirResumenPorId = async (req, res) => {
   const { id } = req.params;
 
-  try {
+  if (!id || isNaN(id)) {
+    return res.status(400).json({ error: "ID inválido" });
+  }
 
-    const r = await pool.query(`
-      SELECT *
-      FROM resumenes
-      WHERE id = $1
-    `, [id]);
+  try {
+    const r = await pool.query(
+      `SELECT * FROM resumenes WHERE id = $1`,
+      [id]
+    );
 
     if (r.rows.length === 0) {
       return res.status(404).json({ error: "Resumen no encontrado" });
@@ -570,7 +572,7 @@ const imprimirResumenPorId = async (req, res) => {
     const resumen = r.rows[0];
 
     const archivo = await generarTicketPDF(resumen.tipo, {
-      periodo: new Date(resumen.fecha_desde).toLocaleString("es-AR"),
+      periodo: resumen.fecha_desde,
       efectivo: resumen.ingresos_efectivo,
       digital: resumen.ingresos_digital,
       gastos: resumen.gastos,
@@ -579,13 +581,17 @@ const imprimirResumenPorId = async (req, res) => {
       caja: resumen.caja_final
     });
 
+    if (!archivo) {
+      return res.status(500).json({ error: "No se pudo generar el PDF" });
+    }
+
     res.json({
-      pdf: `/caja/pdf/${resumen.tipo}/${resumen.archivo_pdf}`
+      pdf: `/caja/pdf/${resumen.tipo}/${archivo}`
     });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Error imprimiendo resumen" });
+    console.error("ERROR imprimirResumenPorId:", error);
+    res.status(500).json({ error: "Error al imprimir resumen" });
   }
 };
 
