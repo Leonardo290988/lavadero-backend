@@ -3,81 +3,107 @@ const pool = require('../db');
 const getDashboard = async (req, res) => { 
   try {
 
-    // Caja abierta
-  const cajaResult = await pool.query(`
-  SELECT id, inicio_caja
-  FROM turnos_caja
-  WHERE estado = 'abierta'
-  ORDER BY id DESC
-  LIMIT 1
-`);
+    // ===============================
+    // CAJA ABIERTA (solo para cajaActual)
+    // ===============================
+    const cajaResult = await pool.query(`
+      SELECT id, inicio_caja
+      FROM turnos_caja
+      WHERE estado = 'abierta'
+      ORDER BY id DESC
+      LIMIT 1
+    `);
 
     const inicioCaja = cajaResult.rows.length
       ? Number(cajaResult.rows[0].inicio_caja)
       : 0;
 
-    let ingresosDia = 0;
-let ingresosEfectivo = 0;
-let ingresosDigital = 0;
+    // ===============================
+    // INGRESOS DEL DÍA (RESUMEN DIARIO)
+    // ===============================
+    const ingresosDiaResult = await pool.query(`
+      SELECT
+        COALESCE(SUM(total_ventas),0) AS total,
+        COALESCE(SUM(ingresos_efectivo),0) AS efectivo,
+        COALESCE(SUM(ingresos_digital),0) AS digital
+      FROM resumenes
+      WHERE tipo = 'diario'
+        AND fecha_desde = (
+          CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires'
+        )::date
+    `);
 
-if (cajaResult.rows.length) {
-  const cajaId = cajaResult.rows[0].id;
+    let ingresosDia = Number(ingresosDiaResult.rows[0].total);
+    let ingresosEfectivo = Number(ingresosDiaResult.rows[0].efectivo);
+    let ingresosDigital = Number(ingresosDiaResult.rows[0].digital);
 
-  const ingresos = await pool.query(`
-    SELECT
-      COALESCE(SUM(CASE 
-        WHEN tipo='ingreso' AND forma_pago='Efectivo' THEN monto END),0) AS efectivo,
-      COALESCE(SUM(CASE 
-        WHEN tipo='ingreso' AND forma_pago!='Efectivo' THEN monto END),0) AS digital
-    FROM caja_movimientos
-    WHERE caja_id = $1
-  `, [cajaId]);
+    // ===============================
+    // SUMAR TURNO ABIERTO (si existe)
+    // ===============================
+    if (cajaResult.rows.length) {
+      const cajaId = cajaResult.rows[0].id;
 
-  ingresosEfectivo = Number(ingresos.rows[0].efectivo);
-  ingresosDigital = Number(ingresos.rows[0].digital);
-  ingresosDia = ingresosEfectivo + ingresosDigital;
-}
+      const turnoActual = await pool.query(`
+        SELECT
+          COALESCE(SUM(CASE 
+            WHEN tipo='ingreso' THEN monto END),0) AS total,
+          COALESCE(SUM(CASE 
+            WHEN tipo='ingreso' AND forma_pago='Efectivo' THEN monto END),0) AS efectivo,
+          COALESCE(SUM(CASE 
+            WHEN tipo='ingreso' AND forma_pago!='Efectivo' THEN monto END),0) AS digital
+        FROM caja_movimientos
+        WHERE caja_id = $1
+      `,[cajaId]);
 
-    // ORDENES HOY
+      ingresosDia += Number(turnoActual.rows[0].total);
+      ingresosEfectivo += Number(turnoActual.rows[0].efectivo);
+      ingresosDigital += Number(turnoActual.rows[0].digital);
+    }
+
+    // ===============================
+    // ÓRDENES DEL DÍA
+    // ===============================
     const ordenesResult = await pool.query(`
-  SELECT COUNT(*) AS total
-  FROM ordenes
-  WHERE
-    (fecha_ingreso AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
-    =
-    (CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
-`);
+      SELECT COUNT(*) AS total
+      FROM ordenes
+      WHERE
+        (fecha_ingreso AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
+        =
+        (CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
+    `);
 
     const ordenesHoy = Number(ordenesResult.rows[0].total);
 
-    // ✅ CAJA ACTUAL REAL (inicio + ingresos - gastos - guardado)
+    // ===============================
+    // CAJA ACTUAL REAL
+    // ===============================
     let cajaActual = inicioCaja;
 
     if (cajaResult.rows.length) {
-
       const cajaId = cajaResult.rows[0].id;
 
-const resumen = await pool.query(`
- SELECT
-  COALESCE(SUM(CASE 
-    WHEN tipo='ingreso' AND forma_pago='Efectivo' THEN monto END),0) AS ingresos_efectivo,
+      const resumenCaja = await pool.query(`
+        SELECT
+          COALESCE(SUM(CASE 
+            WHEN tipo='ingreso' AND forma_pago='Efectivo' THEN monto END),0) AS ingresos_efectivo,
+          COALESCE(SUM(CASE 
+            WHEN tipo='gasto' THEN monto END),0) AS gastos,
+          COALESCE(SUM(CASE 
+            WHEN tipo='guardado' THEN monto END),0) AS guardado
+        FROM caja_movimientos
+        WHERE caja_id = $1
+      `,[cajaId]);
 
-  COALESCE(SUM(CASE 
-    WHEN tipo='gasto' THEN monto END),0) AS gastos,
-
-  COALESCE(SUM(CASE 
-    WHEN tipo='guardado' THEN monto END),0) AS guardado
-
-FROM caja_movimientos
-WHERE caja_id = $1
-`,[cajaId]);
-      const ingresosEf = Number(resumen.rows[0].ingresos_efectivo);
-      const gastos = Number(resumen.rows[0].gastos);
-      const guardado = Number(resumen.rows[0].guardado);
+      const ingresosEf = Number(resumenCaja.rows[0].ingresos_efectivo);
+      const gastos = Number(resumenCaja.rows[0].gastos);
+      const guardado = Number(resumenCaja.rows[0].guardado);
 
       cajaActual = inicioCaja + ingresosEf - gastos - guardado;
     }
 
+    // ===============================
+    // RESPUESTA
+    // ===============================
     res.json({
       cajaActual,
       ingresosDia,
