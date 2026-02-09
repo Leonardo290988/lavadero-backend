@@ -4,25 +4,25 @@ const getDashboard = async (req, res) => {
   try {
 
     // ===============================
-    // FECHA ACTUAL EN ARGENTINA
+    // FECHA HOY (ARGENTINA)
     // ===============================
     const fechaHoyResult = await pool.query(`
       SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date AS hoy
     `);
-
     const hoy = fechaHoyResult.rows[0].hoy;
 
     // ===============================
-    // INGRESOS DEL DÍA (TODOS LOS TURNOS)
+    // INGRESOS DEL DÍA (POR TURNOS)
     // ===============================
     const ingresosResult = await pool.query(`
       SELECT
-        COALESCE(SUM(monto),0) AS total,
-        COALESCE(SUM(CASE WHEN forma_pago='Efectivo' THEN monto END),0) AS efectivo,
-        COALESCE(SUM(CASE WHEN forma_pago!='Efectivo' THEN monto END),0) AS digital
-      FROM caja_movimientos
-      WHERE tipo = 'ingreso'
-        AND (creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires')::date = $1
+        COALESCE(SUM(cm.monto),0) AS total,
+        COALESCE(SUM(CASE WHEN cm.forma_pago = 'Efectivo' THEN cm.monto END),0) AS efectivo,
+        COALESCE(SUM(CASE WHEN cm.forma_pago != 'Efectivo' THEN cm.monto END),0) AS digital
+      FROM caja_movimientos cm
+      JOIN turnos_caja tc ON tc.id = cm.caja_id
+      WHERE cm.tipo = 'ingreso'
+        AND tc.fecha = $1
     `, [hoy]);
 
     const ingresosDia = Number(ingresosResult.rows[0].total);
@@ -30,13 +30,12 @@ const getDashboard = async (req, res) => {
     const ingresosDigital = Number(ingresosResult.rows[0].digital);
 
     // ===============================
-    // ÓRDENES DEL DÍA (COBRADAS HOY)
+    // ÓRDENES DEL DÍA
     // ===============================
     const ordenesResult = await pool.query(`
-      SELECT COUNT(DISTINCT descripcion) AS total
-      FROM caja_movimientos
-      WHERE tipo = 'ingreso'
-        AND (creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires')::date = $1
+      SELECT COUNT(*) AS total
+      FROM ordenes
+      WHERE (fecha_ingreso AT TIME ZONE 'America/Argentina/Buenos_Aires')::date = $1
     `, [hoy]);
 
     const ordenesHoy = Number(ordenesResult.rows[0].total);
@@ -75,7 +74,7 @@ const getDashboard = async (req, res) => {
     }
 
     // ===============================
-    // RESPUESTA FINAL
+    // RESPUESTA
     // ===============================
     res.json({
       cajaActual,
