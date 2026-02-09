@@ -20,15 +20,15 @@ const abrirCaja = async (req, res) => {
   try {
 
     // 👉 Verificar SOLO cajas ABIERTAS hoy en ese turno
-    const existente = await pool.query(
-      `
-      SELECT id
-      FROM turnos_caja
-      WHERE fecha = CURRENT_DATE
-        AND turno = $1
-      `,
-      [turno]
-    );
+ const existente = await pool.query(
+  `
+  SELECT id
+  FROM turnos_caja
+  WHERE fecha = (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
+    AND turno = $1
+  `,
+  [turno]
+);
 
     if (existente.rows.length > 0) {
       return res.status(400).json({
@@ -37,14 +37,19 @@ const abrirCaja = async (req, res) => {
     }
 
     const result = await pool.query(
-      `
-      INSERT INTO turnos_caja
-      (fecha, turno, inicio_caja, estado)
-      VALUES (CURRENT_DATE, $1, $2, 'abierta')
-      RETURNING *
-      `,
-      [turno, inicio_caja]
-    );
+  `
+  INSERT INTO turnos_caja
+  (fecha, turno, inicio_caja, estado)
+  VALUES (
+    (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date,
+    $1,
+    $2,
+    'abierta'
+  )
+  RETURNING *
+  `,
+  [turno, inicio_caja]
+);
 
     res.json(result.rows[0]);
 
@@ -59,14 +64,14 @@ const abrirCaja = async (req, res) => {
 // ======================================
 const getCajaActual = async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT *
-      FROM turnos_caja
-      WHERE fecha = CURRENT_DATE
-        AND estado = 'abierta'
-      ORDER BY id DESC
-      LIMIT 1
-    `);
+   const result = await pool.query(`
+  SELECT *
+  FROM turnos_caja
+  WHERE fecha = (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
+    AND estado = 'abierta'
+  ORDER BY id DESC
+  LIMIT 1
+`);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'No hay caja abierta' });
@@ -281,7 +286,7 @@ const cerrarCaja = async (req, res) => {
     }
 
     // ========= SEMANAL =========
-    const fechaCaja = new Date(caja.rows[0].fecha);
+    const fechaCaja = new Date(caja.rows[0].fecha + "12:00:00");
 
     if (fechaCaja.getDay() === 6) {
 
@@ -384,12 +389,12 @@ const cerrarCaja = async (req, res) => {
 
     // ========= CIERRE =========
     await pool.query(`
-      UPDATE turnos_caja
-      SET estado='cerrada',
-          cierre_caja=NOW(),
-          monto_cierre=$2
-      WHERE id=$1
-    `,[cajaId, efectivoFinal]);
+  UPDATE turnos_caja
+  SET estado='cerrada',
+      cierre_caja = (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'),
+      monto_cierre=$2
+  WHERE id=$1
+`, [cajaId, efectivoFinal]);
 
     res.json({ ok:true, efectivoFinal });
 
