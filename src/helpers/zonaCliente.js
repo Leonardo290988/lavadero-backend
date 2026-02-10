@@ -54,4 +54,4 @@ function obtenerZonaCliente(latCliente, lngCliente) {
   };
 }
 
-module.exports =  {obtenerZonaCliente};
+module.exports =  obtenerZonaCliente;
