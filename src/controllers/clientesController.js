@@ -1,5 +1,7 @@
 const pool = require("../db");
 const geocodeDireccion = require("../helpers/geocodeDireccion");
+const calcularDistanciaKm = require("../helpers/calcularDistancia");
+const calcularZona = require("../helpers/calcularZona");
 
 // ==========================
 // GET CLIENTES
@@ -19,6 +21,7 @@ const getClientes = async (req, res) => {
 // ==========================
 // CREATE CLIENTE
 // ==========================
+
 const createCliente = async (req, res) => {
   const { nombre, telefono, direccion } = req.body;
 
@@ -30,6 +33,26 @@ const createCliente = async (req, res) => {
     // 📍 Geocodificar dirección
     const { lat, lng } = await geocodeDireccion(direccion);
 
+    // 🏪 Coordenadas del lavadero (FIJAS)
+    const LAVADERO_LAT = -34.653777;
+    const LAVADERO_LNG = -58.799750;
+
+    // 📏 Calcular distancia
+    const distanciaKm = calcularDistanciaKm(
+      LAVADERO_LAT,
+      LAVADERO_LNG,
+      lat,
+      lng
+    );
+
+    // 📍 Calcular zona
+    const zona = calcularZona(distanciaKm);
+
+    console.log("👤 Cliente:", nombre);
+    console.log("📏 Distancia:", distanciaKm.toFixed(2), "km");
+    console.log("📍 Zona:", zona);
+
+    // 💾 Guardar cliente
     const result = await pool.query(
       `
       INSERT INTO clientes (nombre, telefono, direccion, lat, lng)
@@ -45,12 +68,20 @@ const createCliente = async (req, res) => {
       ]
     );
 
-    res.status(201).json(result.rows[0]);
+    res.status(201).json({
+      ...result.rows[0],
+      distancia_km: Number(distanciaKm.toFixed(2)),
+      zona
+    });
 
   } catch (error) {
     console.error("CREATE CLIENTE ERROR:", error);
     res.status(500).json({ error: "Error al crear cliente" });
   }
+};
+
+module.exports = {
+  createCliente
 };
 
 // ==========================
