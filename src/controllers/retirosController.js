@@ -3,49 +3,11 @@ console.log("🔥 RETIROS CONTROLLER CARGADO 🔥");
 const generarTicketRetiro = require("../utils/generarTicketRetiro");
 const generarTicketProvisorio = require("../utils/generarTicketProvisorio");
 const { exec } = require("child_process");
+const  obtenerZonaCliente  = require("../helpers/zonaCliente");
 
-function calcularPrecioZona(zona){
-  if(zona == 1) return 5;
-  if(zona == 2) return 3000;
-  if(zona == 3) return 4000;
-  return 0;
-}
 
-// ===============================
-// SOLICITAR RETIRO (cliente)
-// ===============================
-const solicitarRetiro = async (req,res)=>{
-  try {
 
-    console.log("➡️ BODY:", req.body);
 
-    const { cliente_id, orden_id, zona, direccion, tipo } = req.body;
-
-    let precio = 0;
-    if(zona == 1) precio = 5;
-    if(zona == 2) precio = 3000;
-    if(zona == 3) precio = 4000;
-
-    const result = await pool.query(`
-      INSERT INTO retiros
-      (cliente_id, orden_id, zona, direccion, precio, estado, tipo)
-      VALUES ($1,$2,$3,$4,$5,'pendiente',$6)
-      RETURNING *
-    `,
-    [cliente_id, orden_id, zona, direccion, precio, tipo]);
-
-    console.log("✅ RETIRO CREADO:", result.rows[0]);
-
-    res.json(result.rows[0]);
-
-  } catch(err){
-    console.error("❌ ERROR solicitarRetiro:", err);
-    res.status(500).json({error:"Error solicitando retiro"});
-  }
-};
-
-//====================================
-//=====================================
 
 // ===============================
 // CREAR RETIRO PRE-PAGO (cliente)
@@ -53,24 +15,53 @@ const solicitarRetiro = async (req,res)=>{
 const crearRetiroPrePago = async (req, res) => {
   try {
 
-    const { cliente_id, zona, direccion, tipo } = req.body;
+    const { cliente_id, direccion, tipo } = req.body;
 
-    if (!cliente_id || !zona || !direccion || !tipo) {
+    if (!cliente_id || !direccion || !tipo) {
       return res.status(400).json({ error: "Faltan datos" });
     }
 
-    // Calcular precio por zona
-    let precio = 0;
-    if (zona == 1) precio = 2000;
-    if (zona == 2) precio = 3000;
-    if (zona == 3) precio = 4000;
+    // =========================
+    // 1️⃣ Buscar cliente (lat/lng)
+    // =========================
+    const clienteRes = await pool.query(
+      "SELECT lat, lng FROM clientes WHERE id = $1",
+      [cliente_id]
+    );
 
-    const result = await pool.query(`
+    if (clienteRes.rows.length === 0) {
+      return res.status(404).json({ error: "Cliente no encontrado" });
+    }
+
+    const { lat, lng } = clienteRes.rows[0];
+
+    // =========================
+    // 2️⃣ Calcular zona y precio automáticamente
+    // =========================
+    const zonaInfo = obtenerZonaCliente(lat, lng);
+
+    console.log("📏 Distancia:", zonaInfo.distanciaKm, "km");
+    console.log("📍 Zona:", zonaInfo.zona);
+    console.log("💰 Precio:", zonaInfo.precio);
+
+    // =========================
+    // 3️⃣ Insertar retiro
+    // =========================
+    const result = await pool.query(
+      `
       INSERT INTO retiros
       (cliente_id, zona, direccion, precio, estado, tipo)
       VALUES ($1,$2,$3,$4,'esperando_pago',$5)
       RETURNING *
-    `, [cliente_id, zona, direccion, precio, tipo]);
+      `,
+      [
+        cliente_id,
+        zonaInfo.zona,
+        direccion,
+        zonaInfo.precio,
+        tipo
+      ]
+    );
 
     res.json(result.rows[0]);
 
@@ -98,6 +89,7 @@ const getRetirosPendientes = async (req,res)=>{
     LEFT JOIN clientes c ON c.id = r.cliente_id
     LEFT JOIN ordenes o ON o.id = r.orden_id
     WHERE r.estado='pendiente'
+    AND r.orden_id IS NOT NULL
     ORDER BY r.creado_en ASC
   `);
 
@@ -164,7 +156,7 @@ const aceptarRetiro = async (req, res) => {
       SELECT id
       FROM envios
       WHERE cliente_id=$1
-        AND estado IN ('pendiente', 'esperando_pago')
+        AND estado = 'pendiente'
         AND orden_id IS NULL
       LIMIT 1
     `,[retiro.cliente_id]);
@@ -290,16 +282,6 @@ const cancelarRetiroCliente = async (req,res)=>{
   }
 };
 
-// ===============================
-// OBTENER PRECIO POR ZONA
-// ===============================
-const getPrecioZona = (req, res) => {
-  const { zona } = req.params;
-
-  const precio = calcularPrecioZona(zona);
-
-  res.json({ precio });
-}; 
 
 // ===============================
 // MARCAR EN CAMINO
@@ -330,11 +312,9 @@ const marcarEnCamino = async (req,res)=>{
 
 module.exports = {
   aceptarRetiro,
-  getPrecioZona,
   rechazarRetiro,
   cancelarRetiroCliente,
   getRetirosPendientes,
-  solicitarRetiro,
   crearRetiroPrePago,
   marcarEnCamino
 };

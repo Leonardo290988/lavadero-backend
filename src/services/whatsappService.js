@@ -1,19 +1,32 @@
 const axios = require('axios');
 
-const enviarWhatsApp = async ({ telefono, nombre, ordenId, total }) => {
-  // 👉 Esto es un MOCK (simulación)
-  console.log('📲 WHATSAPP ENVIADO');
-  console.log(`
+// ⚠️ Ejemplo con API externa (Twilio / CallMeBot / UltraMsg)
+// Acá lo dejamos genérico
+const enviarWhatsApp = async ({ telefono, nombre, ordenId, total, senia }) => {
+  try {
+    const mensaje = `
 Hola ${nombre} 👋
-Tu pedido N° ${ordenId} ya está listo ✅
+Tu ropa ya está lista para retirar ✅
 
-Total: $${total}
-Podés pasar a retirarlo de Lunes a Sábados de 9hs a 18hs
+🧾 Orden #${ordenId}
+💰 Total: $${total}
+💵 Seña: $${senia}
+➡️ Saldo: $${total - senia}
 
-Gracias por confiar en Lavaderos Moreno 🙌
-`);
+Gracias por confiar en nosotros 😊
+Lavaderos Moreno
+    `.trim();
 
-  // Más adelante acá va la API real
+    console.log('📲 WHATSAPP A ENVIAR:');
+    console.log(telefono);
+    console.log(mensaje);
+
+    // 👉 ACÁ VA LA API REAL (por ahora solo log)
+    // await axios.post('https://api.whatsapp...', {...})
+
+  } catch (error) {
+    console.error('❌ ERROR WHATSAPP:', error.message);
+  }
 };
 
 module.exports = { enviarWhatsApp };

@@ -1,7 +1,6 @@
 const pool = require("../db");
 const geocodeDireccion = require("../helpers/geocodeDireccion");
-const calcularDistanciaKm = require("../helpers/calcularDistancia");
-const calcularZona = require("../helpers/calcularZona");
+
 
 // ==========================
 // GET CLIENTES
@@ -33,25 +32,6 @@ const createCliente = async (req, res) => {
     // 📍 Geocodificar dirección
     const { lat, lng } = await geocodeDireccion(direccion);
 
-    // 🏪 Coordenadas del lavadero (FIJAS)
-    const LAVADERO_LAT = -34.653777;
-    const LAVADERO_LNG = -58.799750;
-
-    // 📏 Calcular distancia
-    const distanciaKm = calcularDistanciaKm(
-      LAVADERO_LAT,
-      LAVADERO_LNG,
-      lat,
-      lng
-    );
-
-    // 📍 Calcular zona
-    const zona = calcularZona(distanciaKm);
-
-    console.log("👤 Cliente:", nombre);
-    console.log("📏 Distancia:", distanciaKm.toFixed(2), "km");
-    console.log("📍 Zona:", zona);
-
     // 💾 Guardar cliente
     const result = await pool.query(
       `
@@ -68,11 +48,7 @@ const createCliente = async (req, res) => {
       ]
     );
 
-    res.status(201).json({
-      ...result.rows[0],
-      distancia_km: Number(distanciaKm.toFixed(2)),
-      zona
-    });
+    res.status(201).json(result.rows[0]);
 
   } catch (error) {
     console.error("CREATE CLIENTE ERROR:", error);
@@ -80,9 +56,7 @@ const createCliente = async (req, res) => {
   }
 };
 
-module.exports = {
-  createCliente
-};
+
 
 // ==========================
 // BUSCAR CLIENTES
@@ -111,8 +85,41 @@ const buscarClientes = async (req, res) => {
   }
 };
 
+// ==========================
+// LOGIN CLIENTE (APP)
+// ==========================
+const loginCliente = async (req, res) => {
+  const { telefono } = req.body;
+
+  if (!telefono) {
+    return res.status(400).json({ error: "Teléfono requerido" });
+  }
+
+  try {
+    const result = await pool.query(
+      `
+      SELECT id, nombre, telefono, direccion, lat, lng
+      FROM clientes
+      WHERE telefono = $1
+      `,
+      [telefono]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Cliente no encontrado" });
+    }
+
+    res.json(result.rows[0]);
+
+  } catch (error) {
+    console.error("LOGIN CLIENTE ERROR:", error);
+    res.status(500).json({ error: "Error login cliente" });
+  }
+};
+
 module.exports = {
   getClientes,
+  loginCliente,
   buscarClientes,
   createCliente
 };

@@ -1,33 +1,57 @@
 const pool = require("../db");
+const obtenerZonaCliente = require("../helpers/zonaCliente");
 
 // ===============================
 // CREAR ENVIO PREPAGO
 // ===============================
 const crearEnvioPrePago = async (req, res) => {
   try {
+    const { cliente_id, direccion, tipo } = req.body;
 
-    const { cliente_id, zona, direccion, tipo } = req.body;
-
-    if (!cliente_id || !zona || !direccion || !tipo) {
+    if (!cliente_id || !direccion || !tipo) {
       return res.status(400).json({ error: "Faltan datos" });
     }
 
-    let precio = 0;
-    if (zona == 1) precio = 5;
-    if (zona == 2) precio = 3000;
-    if (zona == 3) precio = 4000;
+    // 1️⃣ Buscar cliente (lat/lng)
+    const clienteRes = await pool.query(
+      "SELECT lat, lng FROM clientes WHERE id = $1",
+      [cliente_id]
+    );
 
-    const result = await pool.query(`
+    if (clienteRes.rows.length === 0) {
+      return res.status(404).json({ error: "Cliente no encontrado" });
+    }
+
+    const { lat, lng } = clienteRes.rows[0];
+
+    // 2️⃣ Calcular zona y precio automáticamente
+    const zonaInfo = obtenerZonaCliente(lat, lng);
+
+    console.log("📏 Distancia:", zonaInfo.distanciaKm, "km");
+    console.log("📍 Zona:", zonaInfo.zona);
+    console.log("💰 Precio envío:", zonaInfo.precio);
+
+    // 3️⃣ Crear envío en esperando_pago
+    const result = await pool.query(
+      `
       INSERT INTO envios
       (cliente_id, zona, direccion, precio, estado, tipo)
       VALUES ($1,$2,$3,$4,'esperando_pago',$5)
       RETURNING *
-    `, [cliente_id, zona, direccion, precio, tipo]);
+      `,
+      [
+        cliente_id,
+        zonaInfo.zona,
+        direccion,
+        zonaInfo.precio,
+        tipo
+      ]
+    );
 
     res.json(result.rows[0]);
 
   } catch (error) {
-    console.error("crearEnvioPrePago:", error);
+    console.error("❌ crearEnvioPrePago:", error);
     res.status(500).json({ error: "Error creando envío" });
   }
 };

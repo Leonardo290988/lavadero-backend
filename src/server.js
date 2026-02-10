@@ -42,6 +42,7 @@ app.use("/pagos", pagosRoutes);
 app.use("/webhook", webhookRoutes);
 app.use("/envios", enviosRoutes);
 app.use("/usuarios", usuariosRoutes);
+app.use("/auth", require("./routes/auth"));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
