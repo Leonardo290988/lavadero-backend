@@ -7,7 +7,59 @@ const  obtenerZonaCliente  = require("../helpers/zonaCliente");
 
 
 
+// ===============================
+// CREAR RETIRO PRE-PAGO (cliente)
+// ===============================
+const crearRetiroPrePago = async (req, res) => {
+  try {
+    const { cliente_id, direccion, tipo } = req.body;
 
+    if (!cliente_id || !direccion || !tipo) {
+      return res.status(400).json({ error: "Faltan datos" });
+    }
+
+    // 1️⃣ Buscar cliente (lat/lng)
+    const clienteRes = await pool.query(
+      "SELECT lat, lng FROM clientes WHERE id = $1",
+      [cliente_id]
+    );
+
+    if (clienteRes.rows.length === 0) {
+      return res.status(404).json({ error: "Cliente no encontrado" });
+    }
+
+    const { lat, lng } = clienteRes.rows[0];
+
+    // 2️⃣ Calcular zona y precio
+    const zonaInfo = obtenerZonaCliente(lat, lng);
+
+    // 3️⃣ Insertar retiro
+    const result = await pool.query(
+      `
+      INSERT INTO retiros
+      (cliente_id, zona, direccion, precio, estado, tipo)
+      VALUES ($1,$2,$3,$4,'esperando_pago',$5)
+      RETURNING *
+      `,
+      [
+        cliente_id,
+        zonaInfo.zona,
+        direccion,
+        zonaInfo.precio,
+        tipo
+      ]
+    );
+
+    res.json({
+      ok: true,
+      retiro: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error("❌ crearRetiroPrePago:", error);
+    res.status(500).json({ error: "Error creando retiro" });
+  }
+};
 
 
 

@@ -3,6 +3,7 @@ const router = express.Router();
 
 const {
   getRetirosPendientes,
+  crearRetiroPrePago,
   aceptarRetiro,
   rechazarRetiro,
   marcarEnCamino,
@@ -15,6 +16,7 @@ const {
 router.get("/pendientes", getRetirosPendientes);
 // Preview retiro (app cliente)
 router.get("/preview", obtenerPreviewRetiro);
+router.post("/prepago", crearRetiroPrePago);
 
 // Local acepta retiro
 router.put("/:id/aceptar", aceptarRetiro);
