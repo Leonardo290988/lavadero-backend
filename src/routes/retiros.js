@@ -6,14 +6,10 @@ const {
   aceptarRetiro,
   rechazarRetiro,
   marcarEnCamino,
-  crearRetiroPrePago,
   obtenerPreviewRetiro,
   cancelarRetiroCliente
 } = require("../controllers/retirosController");
 
-// Cliente solicita retiro
-//router.post("/", solicitarRetiro);
-router.post("/prepago", crearRetiroPrePago);
 
 // Listar pendientes
 router.get("/pendientes", getRetirosPendientes);

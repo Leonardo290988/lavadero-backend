@@ -1,9 +1,9 @@
 const axios = require("axios");
 const pool = require("../db");
+const obtenerZonaCliente = require("../helpers/zonaCliente");
 
 const webhookMercadoPago = async (req, res) => {
   try {
-
     const paymentId = req.body?.data?.id;
     console.log("🔔 Webhook MP:", paymentId);
 
@@ -13,7 +13,7 @@ const webhookMercadoPago = async (req, res) => {
     // EVITAR DUPLICADOS
     // ===========================
     const existe = await pool.query(
-      "SELECT id FROM pagos_mp WHERE payment_id=$1",
+      "SELECT id FROM pagos_mp WHERE payment_id = $1",
       [paymentId]
     );
 
@@ -29,50 +29,60 @@ const webhookMercadoPago = async (req, res) => {
       `https://api.mercadopago.com/v1/payments/${paymentId}`,
       {
         headers: {
-          Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`
-        }
+          Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
+        },
       }
     );
 
     const pago = response.data;
 
     if (pago.status !== "approved") {
-      console.log("Pago no aprobado");
+      console.log("⏳ Pago no aprobado");
       return res.sendStatus(200);
     }
 
-    const tipo = pago.metadata?.tipo;     // retiro | combo
-    const retiro_id = pago.metadata?.retiro_id;
+    const { tipo, cliente_id, direccion } = pago.metadata;
     const monto = pago.transaction_details.total_paid_amount;
-    const envio_id = pago.metadata?.envio_id;
 
-    console.log("✅ Pago aprobado:", tipo, retiro_id);
+    console.log("✅ Pago aprobado:", tipo, cliente_id);
 
     // ===========================
-    // HABILITAR RETIRO
+    // BUSCAR CLIENTE (lat/lng)
     // ===========================
-    if (tipo === "retiro" || tipo === "combo") {
-      await pool.query(`
-        UPDATE retiros
-        SET estado='pendiente'
-        WHERE id=$1
-      `,[retiro_id]);
+    const clienteRes = await pool.query(
+      "SELECT lat, lng FROM clientes WHERE id = $1",
+      [cliente_id]
+    );
 
-      console.log("🧺 Retiro habilitado");
+    if (clienteRes.rows.length === 0) {
+      console.log("❌ Cliente no encontrado");
+      return res.sendStatus(200);
     }
 
-    // ===========================
-// HABILITAR ENVIO
-// ===========================
-if (tipo === "combo" && envio_id) {
-  await pool.query(`
-    UPDATE envios
-    SET estado='pendiente'
-    WHERE id=$1
-  `, [envio_id]);
+    const { lat, lng } = clienteRes.rows[0];
+    const zonaInfo = obtenerZonaCliente(lat, lng);
 
-  console.log("🚚 Envío habilitado");
-}
+    // ===========================
+    // CREAR RETIRO (AHORA SÍ)
+    // ===========================
+    const retiroRes = await pool.query(
+      `
+      INSERT INTO retiros
+      (cliente_id, zona, direccion, precio, estado, tipo)
+      VALUES ($1,$2,$3,$4,'pendiente',$5)
+      RETURNING id
+      `,
+      [
+        cliente_id,
+        zonaInfo.zona,
+        direccion,
+        zonaInfo.precio,
+        tipo,
+      ]
+    );
+
+    const retiro_id = retiroRes.rows[0].id;
+    console.log("🧺 Retiro creado:", retiro_id);
 
     // ===========================
     // BUSCAR CAJA ABIERTA
@@ -80,51 +90,41 @@ if (tipo === "combo" && envio_id) {
     const cajaRes = await pool.query(`
       SELECT id
       FROM turnos_caja
-      WHERE estado='abierta'
+      WHERE estado = 'abierta'
       ORDER BY id DESC
       LIMIT 1
     `);
 
-    if (cajaRes.rows.length === 0) {
-      console.log("❌ No hay caja abierta");
-      return res.sendStatus(200);
+    if (cajaRes.rows.length > 0) {
+      const caja_id = cajaRes.rows[0].id;
+
+      await pool.query(
+        `
+        INSERT INTO caja_movimientos
+        (caja_id, tipo, descripcion, monto, forma_pago)
+        VALUES ($1,'ingreso','Pago MercadoPago Retiro',$2,'MercadoPago')
+        `,
+        [caja_id, monto]
+      );
     }
 
-    const caja_id = cajaRes.rows[0].id;
-
     // ===========================
-    // REGISTRAR EN CAJA
+    // REGISTRAR PAGO
     // ===========================
-    await pool.query(`
-      INSERT INTO caja_movimientos
-      (caja_id,tipo,descripcion,monto,forma_pago)
-      VALUES ($1,'ingreso',$2,$3,'Transferencia/MercadoPago')
-    `, [
-      caja_id,
-      `Pago MercadoPago Retiro`,
-      monto
-    ]);
-
-    // ===========================
-    // GUARDAR PAGO
-    // ===========================
-    await pool.query(`
+    await pool.query(
+      `
       INSERT INTO pagos_mp
-      (payment_id,tipo,referencia_id,monto)
+      (payment_id, tipo, referencia_id, monto)
       VALUES ($1,$2,$3,$4)
-    `, [
-      paymentId,
-      tipo,
-      retiro_id,
-      monto
-    ]);
+      `,
+      [paymentId, tipo, retiro_id, monto]
+    );
 
-    console.log("✅ Pago procesado completo");
-
+    console.log("✅ Webhook procesado completo");
     res.sendStatus(200);
 
   } catch (error) {
-    console.error("Webhook error:", error);
+    console.error("❌ Webhook error:", error);
     res.sendStatus(500);
   }
 };
