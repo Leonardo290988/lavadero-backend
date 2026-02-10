@@ -61,7 +61,7 @@ const crearRetiroPrePago = async (req, res) => {
 
     // Calcular precio por zona
     let precio = 0;
-    if (zona == 1) precio = 5;
+    if (zona == 1) precio = 2000;
     if (zona == 2) precio = 3000;
     if (zona == 3) precio = 4000;
 
