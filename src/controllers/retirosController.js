@@ -4,6 +4,7 @@ const generarTicketRetiro = require("../utils/generarTicketRetiro");
 const generarTicketProvisorio = require("../utils/generarTicketProvisorio");
 const { exec } = require("child_process");
 const  obtenerZonaCliente  = require("../helpers/zonaCliente");
+const pool = require("../config/db");
 
 
 
