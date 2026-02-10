@@ -1,4 +1,4 @@
-const pool = require("../config/db");
+const pool = require("../db");
 console.log("🔥 RETIROS CONTROLLER CARGADO 🔥");
 const generarTicketRetiro = require("../utils/generarTicketRetiro");
 const generarTicketProvisorio = require("../utils/generarTicketProvisorio");
