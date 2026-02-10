@@ -4,6 +4,7 @@ const router = express.Router();
 const {
   getClientes,
   loginCliente,
+  getClienteById,
   createCliente,
   buscarClientes
 } = require('../controllers/clientesController');
@@ -11,6 +12,7 @@ const {
 // ⚠️ SEARCH SIEMPRE VA ANTES DE '/'
 router.get('/search', buscarClientes);
 router.post("/login", loginCliente);
+router.get('/:id', getClienteById);
 
 router.get('/', getClientes);
 router.post('/', createCliente);

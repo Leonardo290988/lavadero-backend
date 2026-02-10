@@ -117,9 +117,41 @@ const loginCliente = async (req, res) => {
   }
 };
 
+
+
+const getClienteById = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await db.query(
+      'SELECT * FROM clientes WHERE id = $1',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        message: 'Cliente no encontrado',
+      });
+    }
+
+    res.json({
+      ok: true,
+      cliente: result.rows[0],
+    });
+  } catch (error) {
+    console.error('ERROR getClienteById:', error);
+    res.status(500).json({
+      ok: false,
+      message: 'Error del servidor',
+    });
+  }
+};
+
 module.exports = {
   getClientes,
   loginCliente,
+  getClienteById,
   buscarClientes,
   createCliente
 };
