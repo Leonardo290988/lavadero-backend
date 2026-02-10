@@ -345,6 +345,7 @@ const obtenerPreviewRetiro = async (req, res) => {
 };
 
 module.exports = {
+  crearRetiroPrePago,
   aceptarRetiro,
   rechazarRetiro,
   cancelarRetiroCliente,
