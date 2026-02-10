@@ -310,11 +310,57 @@ const marcarEnCamino = async (req,res)=>{
   }
 };
 
+// ===============================
+// PREVIEW RETIRO (APP CLIENTE)
+// ===============================
+const obtenerPreviewRetiro = async (req, res) => {
+  try {
+    const { clienteId } = req.query;
+
+    if (!clienteId) {
+      return res.status(400).json({ error: "clienteId requerido" });
+    }
+
+    // 1️⃣ Buscar cliente
+    const clienteRes = await pool.query(
+      `
+      SELECT direccion, lat, lng
+      FROM clientes
+      WHERE id = $1
+      `,
+      [clienteId]
+    );
+
+    if (clienteRes.rows.length === 0) {
+      return res.status(404).json({ error: "Cliente no encontrado" });
+    }
+
+    const cliente = clienteRes.rows[0];
+
+    // 2️⃣ Calcular zona y precio
+    const zonaInfo = obtenerZonaCliente(cliente.lat, cliente.lng);
+
+    // 3️⃣ Responder preview
+    res.json({
+      ok: true,
+      direccion: cliente.direccion,
+      zona: `Zona ${zonaInfo.zona}`,
+      precio: zonaInfo.precio,
+      distanciaKm: zonaInfo.distanciaKm,
+    });
+
+  } catch (error) {
+    console.error("❌ PREVIEW RETIRO ERROR:", error);
+    res.status(500).json({ error: "Error calculando retiro" });
+  }
+};
+
 module.exports = {
   aceptarRetiro,
   rechazarRetiro,
   cancelarRetiroCliente,
   getRetirosPendientes,
   crearRetiroPrePago,
+  obtenerPreviewRetiro,
   marcarEnCamino
 };
