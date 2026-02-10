@@ -1,10 +1,10 @@
-const pool = require("../db");
+const pool = require("../config/db");
 console.log("🔥 RETIROS CONTROLLER CARGADO 🔥");
 const generarTicketRetiro = require("../utils/generarTicketRetiro");
 const generarTicketProvisorio = require("../utils/generarTicketProvisorio");
 const { exec } = require("child_process");
 const  obtenerZonaCliente  = require("../helpers/zonaCliente");
-const pool = require("../config/db");
+
 
 
 
