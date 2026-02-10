@@ -1,50 +1,55 @@
 process.env.TZ = "America/Argentina/Buenos_Aires";
-require('dotenv').config();
-console.log("🕒 Hora servidor:", new Date().toString());
-const express = require('express');
-const cors = require('cors');
-const app = express();
+require("dotenv").config();
+
+const express = require("express");
+const cors = require("cors");
 const path = require("path");
-const usuariosRoutes = require("./routes/usuarios");
 
-app.use("/pdf", express.static(path.join(__dirname, "pdf")));
+const app = express();
 
+console.log("🕒 Hora servidor:", new Date().toString());
+console.log("🔥🔥🔥 ESTE SERVER ES EL NUEVO 🔥🔥🔥");
+
+// ========================
+// MIDDLEWARES
+// ========================
 app.use(cors({ origin: "*" }));
-app.options("*", cors());   // ✅ PRE-FLIGHT CORS FIX
-app.use((req,res,next)=>{
-  res.header("Access-Control-Allow-Origin","*");
-  res.header("Access-Control-Allow-Headers","*");
-  res.header("Access-Control-Allow-Methods","GET,POST,PUT,DELETE,OPTIONS");
+app.options("*", cors());
+
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "*");
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
   next();
 });
+
 app.use(express.json());
 
-console.log('🔥🔥🔥 ESTE SERVER ES EL NUEVO 🔥🔥🔥');
+// ========================
+// ARCHIVOS ESTÁTICOS
+// ========================
+app.use("/pdf", express.static(path.join(__dirname, "pdf")));
 
+// ========================
 // RUTAS
-const dashboardRoutes = require('./routes/dashboard');
-const clientesRoutes = require('./routes/clientes');
-const serviciosRoutes = require('./routes/servicios');
-const ordenesRoutes  = require('./routes/ordenes');
-const cajaRoutes     = require('./routes/caja');
-const retirosRoutes = require('./routes/retiros');
-const pagosRoutes = require("./routes/pagos");
-const webhookRoutes = require("./routes/webhook");
-const enviosRoutes = require("./routes/envios");
-
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/clientes', clientesRoutes);
-app.use('/servicios', serviciosRoutes);
-app.use('/ordenes', ordenesRoutes);
-app.use('/caja', cajaRoutes);
-app.use('/retiros', retirosRoutes);
-app.use("/pagos", pagosRoutes);
-app.use("/webhook", webhookRoutes);
-app.use("/envios", enviosRoutes);
-app.use("/usuarios", usuariosRoutes);
+// ========================
+app.use("/api/dashboard", require("./routes/dashboard"));
+app.use("/clientes", require("./routes/clientes"));
+app.use("/servicios", require("./routes/servicios"));
+app.use("/ordenes", require("./routes/ordenes"));
+app.use("/caja", require("./routes/caja"));
+app.use("/retiros", require("./routes/retiros"));
+app.use("/pagos", require("./routes/pagos"));
+app.use("/webhook", require("./routes/webhook"));
+app.use("/envios", require("./routes/envios"));
+app.use("/usuarios", require("./routes/usuarios"));
 app.use("/auth", require("./routes/auth"));
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log("Servidor corriendo en puerto", PORT);
+// ========================
+// SERVER
+// ========================
+const PORT = 8080;
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ Servidor corriendo en http://0.0.0.0:${PORT}`);
 });
