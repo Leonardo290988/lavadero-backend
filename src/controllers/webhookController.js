@@ -96,8 +96,8 @@ const webhookMercadoPago = async (req, res) => {
     await pool.query(
       `
       INSERT INTO pagos_mp
-      (payment_id, tipo, referencia_id, monto)
-      VALUES ($1,$2,$3,$4)
+      (payment_id, tipo, referencia_id, monto, estado, pago.status)
+      VALUES ($1,$2,$3,$4,$5)
       `,
       [paymentId, tipo, retiro_id, monto]
     );
