@@ -364,7 +364,40 @@ const obtenerPreviewRetiro = async (req, res) => {
   }
 };
 
+// ===============================
+// RETIRO ACTIVO POR CLIENTE
+// ===============================
+const getRetiroActivoCliente = async (req, res) => {
+  try {
+    const { clienteId } = req.query;
+
+    const r = await pool.query(`
+      SELECT *
+      FROM retiros
+      WHERE cliente_id = $1
+        AND estado IN ('esperando_pago','pendiente','aceptado','en_camino')
+      ORDER BY creado_en DESC
+      LIMIT 1
+    `,[clienteId]);
+
+    if(r.rows.length === 0){
+      return res.json({ activo:false });
+    }
+
+    res.json({
+      activo:true,
+      retiro:r.rows[0]
+    });
+
+  } catch(error){
+    console.error(error);
+    res.status(500).json({error:"Error consultando retiro activo"});
+  }
+};
+
+
 module.exports = {
+  getRetiroActivoCliente,
   crearRetiroPrePago,
   aceptarRetiro,
   rechazarRetiro,

@@ -12,7 +12,6 @@ const crearEnvioPrePago = async (req, res) => {
       return res.status(400).json({ error: "Faltan datos" });
     }
 
-    // 1️⃣ Buscar cliente (lat/lng)
     const clienteRes = await pool.query(
       "SELECT lat, lng FROM clientes WHERE id = $1",
       [cliente_id]
@@ -24,14 +23,8 @@ const crearEnvioPrePago = async (req, res) => {
 
     const { lat, lng } = clienteRes.rows[0];
 
-    // 2️⃣ Calcular zona y precio automáticamente
     const zonaInfo = obtenerZonaCliente(lat, lng);
 
-    console.log("📏 Distancia:", zonaInfo.distanciaKm, "km");
-    console.log("📍 Zona:", zonaInfo.zona);
-    console.log("💰 Precio envío:", zonaInfo.precio);
-
-    // 3️⃣ Crear envío en esperando_pago
     const result = await pool.query(
       `
       INSERT INTO envios
@@ -48,7 +41,10 @@ const crearEnvioPrePago = async (req, res) => {
       ]
     );
 
-    res.json(result.rows[0]);
+    res.json({
+      ok: true,
+      envio: result.rows[0]
+    });
 
   } catch (error) {
     console.error("❌ crearEnvioPrePago:", error);
@@ -213,7 +209,43 @@ const getEnviosEntregados = async (req, res) => {
   }
 };
 
+// ===============================
+// ENVIO ACTIVO POR CLIENTE
+// ===============================
+const getEnvioActivo = async (req, res) => {
+  try {
+    const { clienteId } = req.query;
+
+    if (!clienteId) {
+      return res.status(400).json({ error: "clienteId requerido" });
+    }
+
+    const r = await pool.query(`
+      SELECT *
+      FROM envios
+      WHERE cliente_id = $1
+        AND estado IN ('esperando_pago','pendiente','aceptado','en_camino')
+      ORDER BY id DESC
+      LIMIT 1
+    `, [clienteId]);
+
+    if (r.rows.length === 0) {
+      return res.json({ activo: false });
+    }
+
+    res.json({
+      activo: true,
+      envio: r.rows[0]
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error obteniendo envío activo" });
+  }
+};
+
 module.exports = {
+  getEnvioActivo,
   entregarEnvio,
   getEnviosEntregados,
   marcarEnvioEntregado,

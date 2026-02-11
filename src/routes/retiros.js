@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const {
+  getRetiroActivoCliente,
   getRetirosPendientes,
   crearRetiroPrePago,
   aceptarRetiro,
@@ -17,6 +18,7 @@ router.get("/pendientes", getRetirosPendientes);
 // Preview retiro (app cliente)
 router.get("/preview", obtenerPreviewRetiro);
 router.post("/prepago", crearRetiroPrePago);
+router.get("/activo", getRetiroActivoCliente);
 
 // Local acepta retiro
 router.put("/:id/aceptar", aceptarRetiro);
