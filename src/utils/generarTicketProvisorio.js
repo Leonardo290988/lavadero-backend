@@ -2,45 +2,45 @@ const fs = require("fs");
 const path = require("path");
 const PDFDocument = require("pdfkit");
 
+const carpeta = path.join(__dirname, "../pdf/retiros");
 
-const carpeta = path.join(__dirname, "../pdf/provisorios");
-
-function generarTicketProvisorio(orden) {
-
-  
+function generarTicketProvisorio({ id, cliente, direccion, tiene_envio }) {
 
   if (!fs.existsSync(carpeta)) {
     fs.mkdirSync(carpeta, { recursive: true });
   }
 
-  const archivo = path.join(carpeta, `orden_${orden.id}_provisorio.pdf`);
+  const archivo = path.join(carpeta, `retiro_${id}.pdf`);
 
-  const doc = new PDFDocument({ size: [226, 600], margin: 10 });
+  const doc = new PDFDocument({
+    size: [226, 400],
+    margin: 10
+  });
+
   doc.pipe(fs.createWriteStream(archivo));
 
-  doc.fontSize(20).text("LAVADEROS MORENO", { align: "center" });
-  doc.moveDown(0.5);
-  doc.fontSize(12).text("TICKET PROVISORIO", { align: "center" });
+  doc.fontSize(16).text("LAVADEROS MORENO", { align: "center" });
+  doc.moveDown(0.3);
+  doc.fontSize(10).text("Ticket Provisorio de Retiro", { align: "center" });
   doc.moveDown();
 
-  doc.fontSize(12);
-  doc.text(`Orden: ${orden.id}`);
-  doc.text(`Cliente: ${orden.cliente}`);
-  doc.text(`Fecha: ${new Date().toLocaleString("es-AR", { hour12: false})}`);
+  doc.fontSize(11);
+  doc.text(`Orden N°: ${id}`);
+  doc.text(`Cliente: ${cliente}`);
+  doc.text(`Dirección: ${direccion}`);
+  doc.text(`Fecha: ${new Date().toLocaleString("es-AR", { hour12: false })}`);
 
-  doc.moveDown();
-  doc.text("------------------------");
-  doc.text("Servicios pendientes");
-  doc.text("------------------------");
-
-  if (orden.tiene_envio) {
+  if (tiene_envio) {
+    doc.moveDown();
     doc.text("Incluye ENVÍO a domicilio");
   }
 
   doc.moveDown();
-  doc.fontSize(10).text("Presentar este ticket al ingresar la ropa");
+  doc.fontSize(9).text("Ticket generado automáticamente", { align: "center" });
 
   doc.end();
+
   return archivo;
 }
+
 module.exports = generarTicketProvisorio;

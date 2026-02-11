@@ -2,7 +2,6 @@ const pool = require("../db");
 console.log("🔥 RETIROS CONTROLLER CARGADO 🔥");
 const generarTicketRetiro = require("../utils/generarTicketRetiro");
 const generarTicketProvisorio = require("../utils/generarTicketProvisorio");
-const { exec } = require("child_process");
 const  obtenerZonaCliente  = require("../helpers/zonaCliente");
 
 
@@ -230,19 +229,18 @@ const datos = datosRes.rows[0];
     // =========================
     const pdf = generarTicketProvisorio({
       id: orden.id,
-      cliente_id: datos.cliente_id,
       cliente: datos.cliente,
       direccion: datos.direccion,
       tiene_envio: tieneEnvio
     });
 
     // ABRIR AUTOMATICAMENTE
-    exec(`start "" "${pdf}"`);
 
     res.json({
       ok:true,
       orden_id: orden.id,
-      tiene_envio: tieneEnvio
+      tiene_envio: tieneEnvio,
+      pdf: `/pdf/retiros/retiro_${orden.id}.pdf`
     });
 
   } catch (error) {
