@@ -47,6 +47,23 @@ const crearRetiroPrePago = async (req, res) => {
       throw new Error("zonaInfo inválido: " + JSON.stringify(zonaInfo));
     }
 
+    // 0️⃣ Verificar si ya hay retiro esperando_pago
+const existente = await pool.query(`
+  SELECT *
+  FROM retiros
+  WHERE cliente_id = $1
+  AND estado = 'esperando_pago'
+  ORDER BY id DESC
+  LIMIT 1
+`, [cliente_id]);
+
+if (existente.rows.length > 0) {
+  return res.json({
+    ok: true,
+    retiro: existente.rows[0]
+  });
+}
+
     // 3️⃣ Insertar retiro
     const result = await pool.query(
       `
@@ -375,7 +392,7 @@ const getRetiroActivoCliente = async (req, res) => {
       SELECT *
       FROM retiros
       WHERE cliente_id = $1
-        AND estado IN ('esperando_pago','pendiente','aceptado','en_camino')
+        AND estado IN ('pendiente','aceptado','en_camino')
       ORDER BY creado_en DESC
       LIMIT 1
     `,[clienteId]);
