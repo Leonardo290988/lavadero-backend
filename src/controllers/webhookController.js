@@ -82,7 +82,7 @@ const webhookMercadoPago = async (req, res) => {
         `
         INSERT INTO caja_movimientos
         (caja_id, tipo, descripcion, monto, forma_pago)
-        VALUES ($1,'ingreso','Pago MercadoPago Retiro',$2,'MercadoPago')
+        VALUES ($1,'ingreso','Pago MercadoPago Retiro',$2,'Transferencia/MercadoPago')
         `,
         [caja_id, monto]
       );
