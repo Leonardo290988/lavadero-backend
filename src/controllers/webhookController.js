@@ -57,7 +57,7 @@ const webhookMercadoPago = async (req, res) => {
       `
       UPDATE retiros
       SET estado = 'pendiente'
-      WHERE id = $1
+      WHERE id = referencia_id
       `,
       [retiro_id]
     );
