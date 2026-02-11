@@ -57,7 +57,7 @@ const webhookMercadoPago = async (req, res) => {
       `
       UPDATE retiros
       SET estado = 'pendiente'
-      WHERE id = referencia_id
+      WHERE id = $1
       `,
       [retiro_id]
     );
@@ -96,10 +96,10 @@ const webhookMercadoPago = async (req, res) => {
     await pool.query(
       `
       INSERT INTO pagos_mp
-      (payment_id, tipo, referencia_id, monto, estado, pago.status)
+      (payment_id, tipo, referencia_id, monto, estado)
       VALUES ($1,$2,$3,$4,$5)
       `,
-      [paymentId, tipo, retiro_id, monto]
+      [paymentId, tipo, retiro_id, monto,pago.status]
     );
 
     console.log("✅ Webhook procesado completo");
