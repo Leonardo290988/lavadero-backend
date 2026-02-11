@@ -36,8 +36,8 @@ const crearPreferencia = async (req, res) => {
           retiro_id: retiro_id || null,
           envio_id: envio_id || null
         },
-        notification_url:
-          "https://pyrolytic-ericka-adultly.ngrok-free.dev/webhook/mercadopago"
+       notification_url:
+  "https://lavadero-backend-production-e1eb.up.railway.app/webhook/mercadopago"
       }
     });
 

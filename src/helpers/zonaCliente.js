@@ -6,7 +6,7 @@ const LAVADERO_LNG = -58.799750;
 
 // 💰 Precios por zona
 const PRECIOS = {
-  1: 1500,
+  1: 1,
   2: 2500,
   3: 3500
 };
