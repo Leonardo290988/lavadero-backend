@@ -1,6 +1,5 @@
 const axios = require("axios");
 const pool = require("../db");
-const obtenerZonaCliente = require("../helpers/zonaCliente");
 
 const webhookMercadoPago = async (req, res) => {
   try {
@@ -41,48 +40,29 @@ const webhookMercadoPago = async (req, res) => {
       return res.sendStatus(200);
     }
 
-    const { tipo, cliente_id, direccion } = pago.metadata;
+    const { tipo, retiro_id } = pago.metadata;
     const monto = pago.transaction_details.total_paid_amount;
 
-    console.log("✅ Pago aprobado:", tipo, cliente_id);
+    console.log("✅ Pago aprobado:", tipo, retiro_id);
 
-    // ===========================
-    // BUSCAR CLIENTE (lat/lng)
-    // ===========================
-    const clienteRes = await pool.query(
-      "SELECT lat, lng FROM clientes WHERE id = $1",
-      [cliente_id]
-    );
-
-    if (clienteRes.rows.length === 0) {
-      console.log("❌ Cliente no encontrado");
+    if (!retiro_id) {
+      console.log("❌ retiro_id no encontrado en metadata");
       return res.sendStatus(200);
     }
 
-    const { lat, lng } = clienteRes.rows[0];
-    const zonaInfo = obtenerZonaCliente(lat, lng);
-
     // ===========================
-    // CREAR RETIRO (AHORA SÍ)
+    // ACTUALIZAR RETIRO EXISTENTE
     // ===========================
-    const retiroRes = await pool.query(
+    await pool.query(
       `
-      INSERT INTO retiros
-      (cliente_id, zona, direccion, precio, estado, tipo)
-      VALUES ($1,$2,$3,$4,'pendiente',$5)
-      RETURNING id
+      UPDATE retiros
+      SET estado = 'pendiente'
+      WHERE id = $1
       `,
-      [
-        cliente_id,
-        zonaInfo.zona,
-        direccion,
-        zonaInfo.precio,
-        tipo,
-      ]
+      [retiro_id]
     );
 
-    const retiro_id = retiroRes.rows[0].id;
-    console.log("🧺 Retiro creado:", retiro_id);
+    console.log("🧺 Retiro habilitado:", retiro_id);
 
     // ===========================
     // BUSCAR CAJA ABIERTA
@@ -106,6 +86,8 @@ const webhookMercadoPago = async (req, res) => {
         `,
         [caja_id, monto]
       );
+
+      console.log("💰 Impactado en caja");
     }
 
     // ===========================
