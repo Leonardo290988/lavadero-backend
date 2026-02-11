@@ -12,10 +12,8 @@ const  obtenerZonaCliente  = require("../helpers/zonaCliente");
 // ===============================
 const crearRetiroPrePago = async (req, res) => {
 
-console.log("🔥 HEADERS:", req.headers);
-
-
-console.log("🚀 ENTRO A crearRetiroPrePago", req.body);
+  console.log("🔥 HEADERS:", req.headers);
+  console.log("🚀 ENTRO A crearRetiroPrePago", req.body);
 
   try {
     const { cliente_id, direccion, tipo } = req.body;
@@ -36,8 +34,18 @@ console.log("🚀 ENTRO A crearRetiroPrePago", req.body);
 
     const { lat, lng } = clienteRes.rows[0];
 
+    if (lat == null || lng == null) {
+      throw new Error("Cliente sin lat/lng configurados");
+    }
+
     // 2️⃣ Calcular zona y precio
     const zonaInfo = obtenerZonaCliente(lat, lng);
+
+    console.log("🧪 zonaInfo:", zonaInfo);
+
+    if (!zonaInfo || !zonaInfo.zona || !zonaInfo.precio) {
+      throw new Error("zonaInfo inválido: " + JSON.stringify(zonaInfo));
+    }
 
     // 3️⃣ Insertar retiro
     const result = await pool.query(
@@ -62,8 +70,14 @@ console.log("🚀 ENTRO A crearRetiroPrePago", req.body);
     });
 
   } catch (error) {
-    console.error("❌ crearRetiroPrePago:", error);
-    res.status(500).json({ error: "Error creando retiro" });
+    console.error("❌ ERROR crearRetiroPrePago");
+    console.error(error);
+    console.error("STACK:", error.stack);
+
+    res.status(500).json({
+      error: "Error creando retiro",
+      detalle: error.message,
+    });
   }
 };
 
