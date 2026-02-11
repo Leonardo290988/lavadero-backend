@@ -12,6 +12,9 @@ const  obtenerZonaCliente  = require("../helpers/zonaCliente");
 // ===============================
 const crearRetiroPrePago = async (req, res) => {
 
+console.log("🔥 HEADERS:", req.headers);
+
+
 console.log("🚀 ENTRO A crearRetiroPrePago", req.body);
 
   try {
