@@ -156,7 +156,7 @@ const aceptarRetiro = async (req, res) => {
     const ordenRes = await client.query(`
       INSERT INTO ordenes
       (cliente_id, estado, fecha_ingreso, tiene_envio)
-      VALUES ($1,'ingresado',NOW(),false)
+      VALUES ($1,'ingresado', (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires) ,false)
       RETURNING *
     `,[retiro.cliente_id]);
 
@@ -227,12 +227,12 @@ const datos = datosRes.rows[0];
     // =========================
     // GENERAR PDF PROVISORIO
     // =========================
-    const pdf = generarTicketProvisorio({
-      id: orden.id,
-      cliente: datos.cliente,
-      direccion: datos.direccion,
-      tiene_envio: tieneEnvio
-    });
+const archivo = await generarTicketProvisorio("provisorios", {
+  id: orden.id,
+  cliente: datos.cliente,
+  direccion: datos.direccion,
+  tiene_envio: tieneEnvio
+});
 
     // ABRIR AUTOMATICAMENTE
 
@@ -240,7 +240,7 @@ const datos = datosRes.rows[0];
       ok:true,
       orden_id: orden.id,
       tiene_envio: tieneEnvio,
-      pdf: `/pdf/retiros/retiro_${orden.id}.pdf`
+      pdf: `/pdf/provisorios/${archivo}.pdf`
     });
 
   } catch (error) {
