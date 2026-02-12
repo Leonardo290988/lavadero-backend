@@ -216,6 +216,7 @@ const datosRes = await client.query(`
     o.id AS orden_id,
     o.cliente_id,
     c.nombre AS cliente,
+    c.telefono,
     r.direccion
   FROM ordenes o
   JOIN clientes c ON c.id = o.cliente_id
