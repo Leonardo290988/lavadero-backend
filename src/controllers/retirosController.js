@@ -231,6 +231,7 @@ const datos = datosRes.rows[0];
 const nombreArchivo = await generarTicketProvisorio({
   id: orden.id,
   cliente: datos.cliente,
+  telefono: datos.telefono,
   direccion: datos.direccion,
   tiene_envio: tieneEnvio
 });

@@ -7,6 +7,7 @@ const carpeta = path.join(__dirname, "../pdf/provisorios");
 const generarTicketProvisorio = async ({
   id,
   cliente,
+  telefono,
   direccion,
   tiene_envio
 }) => {
@@ -32,6 +33,7 @@ const generarTicketProvisorio = async ({
 
   doc.text(`Orden: ${id}`);
   doc.text(`Cliente: ${cliente}`);
+  doc.text(`Telefono: ${telefono || "-"}`)
   doc.text(`Dirección: ${direccion}`);
   doc.text(`Fecha: ${new Date().toLocaleString("es-AR", { hour12:false })}`);
 
