@@ -8,6 +8,7 @@ const {
   aceptarRetiro,
   rechazarRetiro,
   marcarEnCamino,
+  marcarRetirado,
   obtenerPreviewRetiro,
   cancelarRetiroCliente
 } = require("../controllers/retirosController");
@@ -22,6 +23,7 @@ router.get("/activo", getRetiroActivoCliente);
 
 // Local acepta retiro
 router.put("/:id/aceptar", aceptarRetiro);
+router.put("/:id/retirado", marcarRetirado);
 
 // Local rechaza retiro
 router.put("/:id/rechazar", rechazarRetiro);
