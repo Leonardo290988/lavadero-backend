@@ -227,7 +227,7 @@ const datos = datosRes.rows[0];
     // =========================
     // GENERAR PDF PROVISORIO
     // =========================
-const archivo = await generarTicketProvisorio("provisorios", {
+const archivo = await generarTicketProvisorio({
   id: orden.id,
   cliente: datos.cliente,
   direccion: datos.direccion,
