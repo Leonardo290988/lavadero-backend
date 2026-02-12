@@ -126,66 +126,98 @@ const getRetirosPendientes = async (req, res) => {
 // ===============================
 const aceptarRetiro = async (req, res) => {
   const { id } = req.params;
+  const client = await pool.connect();
 
   try {
+    await client.query("BEGIN");
 
     // 1️⃣ Traer retiro + cliente
-    const retiroRes = await pool.query(`
-      SELECT r.*, c.nombre AS cliente, c.telefono
+    const retiroRes = await client.query(`
+      SELECT r.*, c.nombre, c.telefono
       FROM retiros r
       JOIN clientes c ON c.id = r.cliente_id
-      WHERE r.id = $1
-        AND r.estado = 'pendiente'
+      WHERE r.id=$1
     `,[id]);
 
     if (retiroRes.rows.length === 0) {
-      return res.status(404).json({ error:"Retiro no encontrado o ya procesado" });
+      return res.status(404).json({ error: "Retiro no encontrado" });
     }
 
     const retiro = retiroRes.rows[0];
 
-    // 2️⃣ Ver si ya existe envío pendiente sin orden
-    const envioRes = await pool.query(`
+    if (retiro.estado !== "pendiente") {
+      return res.status(400).json({ error: "Retiro ya procesado" });
+    }
+
+    // 2️⃣ Crear orden en estado ingresado
+    const ordenRes = await client.query(`
+      INSERT INTO ordenes
+      (cliente_id, estado, fecha_ingreso, tiene_envio)
+      VALUES ($1,'ingresado', NOW(), false)
+      RETURNING *
+    `,[retiro.cliente_id]);
+
+    const orden = ordenRes.rows[0];
+    let tieneEnvio = false;
+
+    // 3️⃣ Ver si existe envío prepago
+    const envioRes = await client.query(`
       SELECT id
       FROM envios
-      WHERE cliente_id = $1
-        AND estado = 'pendiente'
+      WHERE cliente_id=$1
+        AND estado='pendiente'
         AND orden_id IS NULL
       LIMIT 1
     `,[retiro.cliente_id]);
 
-    const tieneEnvio = envioRes.rows.length > 0;
+    if (envioRes.rows.length > 0) {
+      tieneEnvio = true;
 
-    // 3️⃣ Actualizar estado del retiro
-    await pool.query(`
+      await client.query(`
+        UPDATE ordenes
+        SET tiene_envio=true
+        WHERE id=$1
+      `,[orden.id]);
+
+      await client.query(`
+        UPDATE envios
+        SET orden_id=$1
+        WHERE id=$2
+      `,[orden.id, envioRes.rows[0].id]);
+    }
+
+    // 4️⃣ Actualizar retiro
+    await client.query(`
       UPDATE retiros
-      SET estado = 'aceptado'
-      WHERE id = $1
-    `,[id]);
+      SET estado='aceptado',
+          orden_id=$1
+      WHERE id=$2
+    `,[orden.id, id]);
 
-    // 4️⃣ Generar ticket provisorio
+    await client.query("COMMIT");
+
+    // 5️⃣ Generar ticket provisorio AHORA
     const nombreArchivo = await generarTicketProvisorio({
-      id: retiro.id,
-      cliente: retiro.cliente,
+      id: orden.id,
+      cliente: retiro.nombre,
       telefono: retiro.telefono,
       direccion: retiro.direccion,
       tiene_envio: tieneEnvio
     });
 
-    // 5️⃣ Responder
     res.json({
-      ok:true,
-      retiro_id: retiro.id,
-      tiene_envio: tieneEnvio,
+      ok: true,
       pdf: `/pdf/provisorios/${nombreArchivo}`
     });
 
   } catch (error) {
+    await client.query("ROLLBACK");
     console.error(error);
-    res.status(500).json({ error:"Error aceptando retiro" });
+    res.status(500).json({ error: "Error aceptando retiro" });
+  } finally {
+    client.release();
   }
 };
-
 // ===============================
 // RECHAZAR RETIRO (local)
 // ===============================
@@ -347,96 +379,26 @@ const getRetiroActivoCliente = async (req, res) => {
 // ===============================
 // MARCAR COMO RETIRADO
 // ===============================
-const marcarRetirado = async (req, res) => {
+const marcarRetirado = async (req,res)=>{
   const { id } = req.params;
-  const client = await pool.connect();
 
   try {
-    await client.query("BEGIN");
-
-    // 1️⃣ Buscar retiro
-    const retiroRes = await client.query(
-      `SELECT * FROM retiros WHERE id=$1`,
-      [id]
-    );
-
-    if (retiroRes.rows.length === 0) {
-      return res.status(404).json({ error: "Retiro no encontrado" });
-    }
-
-    const retiro = retiroRes.rows[0];
-
-    if (retiro.estado !== "en_camino") {
-      return res.status(400).json({ error: "El retiro no está en camino" });
-    }
-
-    // 2️⃣ Crear orden recién ahora
-    const ordenRes = await client.query(
-      `
-      INSERT INTO ordenes
-      (cliente_id, estado, fecha_ingreso, tiene_envio)
-      VALUES ($1,'ingresado', NOW(), false)
-      RETURNING *
-      `,
-      [retiro.cliente_id]
-    );
-
-    const orden = ordenRes.rows[0];
-
-    let tieneEnvio = false;
-
-    // 3️⃣ Ver si existe envío pendiente del mismo cliente
-    const envioRes = await client.query(
-      `
-      SELECT id
-      FROM envios
-      WHERE cliente_id=$1
-        AND estado='pendiente'
-        AND orden_id IS NULL
-      LIMIT 1
-      `,
-      [retiro.cliente_id]
-    );
-
-    if (envioRes.rows.length > 0) {
-      tieneEnvio = true;
-
-      await client.query(
-        `UPDATE ordenes SET tiene_envio=true WHERE id=$1`,
-        [orden.id]
-      );
-
-      await client.query(
-        `UPDATE envios SET orden_id=$1 WHERE id=$2`,
-        [orden.id, envioRes.rows[0].id]
-      );
-    }
-
-    // 4️⃣ Actualizar retiro a retirado
-    await client.query(
-      `
+    const r = await pool.query(`
       UPDATE retiros
-      SET estado='retirado',
-          orden_id=$1
-      WHERE id=$2
-      `,
-      [orden.id, id]
-    );
+      SET estado='retirado'
+      WHERE id=$1 AND estado='en_camino'
+      RETURNING *
+    `,[id]);
 
-    await client.query("COMMIT");
+    if(r.rows.length === 0){
+      return res.status(404).json({error:"Retiro no encontrado"});
+    }
 
-    res.json({
-      ok: true,
-      orden_id: orden.id,
-      tiene_envio: tieneEnvio
-    });
+    res.json({ok:true});
 
-  } catch (error) {
-    await client.query("ROLLBACK");
+  } catch(error){
     console.error(error);
-    res.status(500).json({ error: "Error marcando retiro como retirado" });
-  } finally {
-    client.release();
+    res.status(500).json({error:"Error marcando retirado"});
   }
 };
 

@@ -179,23 +179,31 @@ const getServiciosDeOrden = async (req, res) => {
 // GET /ordenes/abiertas
 const getOrdenesAbiertas = async (req, res) => {
   try {
+
     const ordenesResult = await pool.query(`
       SELECT
         o.id,
-  o.fecha_ingreso ,
+        o.fecha_ingreso,
         o.estado,
         o.senia,
         c.nombre AS cliente,
-        o.tiene_envio
+        o.tiene_envio,
+        r.estado AS estado_retiro
       FROM ordenes o
       JOIN clientes c ON c.id = o.cliente_id
-      WHERE o.estado IN ('ingresado' , 'confirmada')
+      LEFT JOIN retiros r ON r.orden_id = o.id
+      WHERE o.estado IN ('ingresado','confirmada')
+        AND (
+              r.id IS NULL          -- orden creada manual
+              OR r.estado = 'retirado'  -- retiro ya traído al local
+            )
       ORDER BY o.fecha_ingreso DESC
     `);
 
     const ordenes = [];
 
     for (const o of ordenesResult.rows) {
+
       const serviciosResult = await pool.query(`
         SELECT
           s.nombre,
@@ -227,7 +235,6 @@ const getOrdenesAbiertas = async (req, res) => {
         }
       });
 
-      // Descontar seña
       total -= Number(o.senia) || 0;
       if (total < 0) total = 0;
 
@@ -237,7 +244,7 @@ const getOrdenesAbiertas = async (req, res) => {
         estado: o.estado,
         cliente: o.cliente,
         total,
-        tiene_envio: o.tiene_envio   // ✅ ESTA LINEA
+        tiene_envio: o.tiene_envio
       });
     }
 
@@ -247,7 +254,7 @@ const getOrdenesAbiertas = async (req, res) => {
     console.error('❌ ERROR GET ORDENES ABIERTAS:', error.message);
     res.status(500).json({ error: 'Error al obtener órdenes abiertas' });
   }
-};
+}
 
 
 
