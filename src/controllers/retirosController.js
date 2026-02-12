@@ -240,7 +240,7 @@ const archivo = await generarTicketProvisorio({
       ok:true,
       orden_id: orden.id,
       tiene_envio: tieneEnvio,
-      pdf: `/pdf/provisorios/${archivoArchivo}`
+      pdf: `/pdf/provisorios/${nombreArchivo}`
     });
 
   } catch (error) {
