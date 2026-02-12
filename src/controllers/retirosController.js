@@ -114,7 +114,7 @@ const getRetirosPendientes = async (req, res) => {
       c.nombre AS cliente
     FROM retiros r
     JOIN clientes c ON c.id = r.cliente_id
-    WHERE r.estado = 'pendiente'
+    WHERE r.estado IN ('pendiente', 'aceptado', 'en_camino') 
     ORDER BY r.creado_en ASC
   `);
 
