@@ -1012,27 +1012,39 @@ const eliminarServicioDeOrden = async (req, res) => {
 
 // GET /ordenes/cliente/:clienteId
 const getOrdenesCliente = async (req, res) => {
-  const { clienteId } = req.params;
-
   try {
+    const { id } = req.params;
+
     const result = await pool.query(`
       SELECT 
         o.id,
         o.estado,
         o.fecha_ingreso,
         o.fecha_retiro,
-        o.total,
-        o.tiene_envio
+        o.tiene_envio,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'servicio_id', os.servicio_id,
+              'cantidad', os.cantidad,
+              'precio_unitario', os.precio_unitario,
+              'subtotal', os.cantidad * os.precio_unitario
+            )
+          ) FILTER (WHERE os.id IS NOT NULL),
+          '[]'
+        ) AS detalles
       FROM ordenes o
+      LEFT JOIN orden_servicios os ON os.orden_id = o.id
       WHERE o.cliente_id = $1
+      GROUP BY o.id
       ORDER BY o.id DESC
-    `, [clienteId]);
+    `, [id]);
 
     res.json(result.rows);
 
   } catch (error) {
-    console.error("❌ ERROR GET ORDENES CLIENTE:", error.message);
-    res.status(500).json({ error: "Error obteniendo órdenes" });
+    console.error("❌ ERROR GET ORDENES CLIENTE:", error);
+    res.status(500).json({ error: "Error al obtener órdenes" });
   }
 };
 
