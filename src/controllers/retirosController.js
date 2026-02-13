@@ -11,17 +11,13 @@ const  obtenerZonaCliente  = require("../helpers/zonaCliente");
 // ===============================
 const crearRetiroPrePago = async (req, res) => {
 
-  console.log("🔥 HEADERS:", req.headers);
-  console.log("🚀 ENTRO A crearRetiroPrePago", req.body);
-
   try {
-    const { cliente_id, direccion, tipo } = req.body;
+    const { cliente_id, direccion, tipo, quiere_envio } = req.body;
 
     if (!cliente_id || !direccion || !tipo) {
       return res.status(400).json({ error: "Faltan datos" });
     }
 
-    // 1️⃣ Buscar cliente (lat/lng)
     const clienteRes = await pool.query(
       "SELECT lat, lng FROM clientes WHERE id = $1",
       [cliente_id]
@@ -33,66 +29,57 @@ const crearRetiroPrePago = async (req, res) => {
 
     const { lat, lng } = clienteRes.rows[0];
 
-    if (lat == null || lng == null) {
-      throw new Error("Cliente sin lat/lng configurados");
-    }
-
-    // 2️⃣ Calcular zona y precio
     const zonaInfo = obtenerZonaCliente(lat, lng);
 
-    console.log("🧪 zonaInfo:", zonaInfo);
-
-    if (!zonaInfo || !zonaInfo.zona || !zonaInfo.precio) {
-      throw new Error("zonaInfo inválido: " + JSON.stringify(zonaInfo));
-    }
-
-    // 0️⃣ Verificar si ya hay retiro esperando_pago
-const existente = await pool.query(`
-  SELECT *
-  FROM retiros
-  WHERE cliente_id = $1
-  AND estado = 'esperando_pago'
-  ORDER BY id DESC
-  LIMIT 1
-`, [cliente_id]);
-
-if (existente.rows.length > 0) {
-  return res.json({
-    ok: true,
-    retiro: existente.rows[0]
-  });
-}
-
-    // 3️⃣ Insertar retiro
-    const result = await pool.query(
+    // 🔹 Crear retiro
+    const retiroRes = await pool.query(
       `
       INSERT INTO retiros
       (cliente_id, zona, direccion, precio, estado, tipo)
-      VALUES ($1,$2,$3,$4,'esperando_pago',$5)
+      VALUES ($1,$2,$3,$4,'esperando_pago','retiro')
       RETURNING *
       `,
       [
         cliente_id,
         zonaInfo.zona,
         direccion,
-        zonaInfo.precio,
-        tipo
+        zonaInfo.precio
       ]
     );
 
+    let envioCreado = null;
+
+    // 🔹 Si pidió envío también lo creamos
+    if (quiere_envio) {
+
+      const envioRes = await pool.query(
+        `
+        INSERT INTO envios
+        (cliente_id, zona, direccion, precio, estado)
+        VALUES ($1,$2,$3,$4,'pendiente')
+        RETURNING *
+        `,
+        [
+          cliente_id,
+          zonaInfo.zona,
+          direccion,
+          zonaInfo.precio
+        ]
+      );
+
+      envioCreado = envioRes.rows[0];
+    }
+
     res.json({
       ok: true,
-      retiro: result.rows[0]
+      retiro: retiroRes.rows[0],
+      envio: envioCreado
     });
 
   } catch (error) {
-    console.error("❌ ERROR crearRetiroPrePago");
     console.error(error);
-    console.error("STACK:", error.stack);
-
     res.status(500).json({
-      error: "Error creando retiro",
-      detalle: error.message,
+      error: "Error creando retiro"
     });
   }
 };
