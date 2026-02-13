@@ -262,6 +262,44 @@ const getEnvioActivo = async (req, res) => {
   }
 };
 
+// POST /envios/desde-orden
+const crearEnvioDesdeOrden = async (req, res) => {
+  const { orden_id } = req.body;
+
+  try {
+
+    const ordenRes = await pool.query(`
+      SELECT cliente_id
+      FROM ordenes
+      WHERE id = $1
+        AND estado = 'lista'
+        AND (tiene_envio = false OR tiene_envio IS NULL)
+    `, [orden_id]);
+
+    if (ordenRes.rows.length === 0) {
+      return res.status(400).json({ error: "Orden no válida para envío" });
+    }
+
+    const cliente_id = ordenRes.rows[0].cliente_id;
+
+    const result = await pool.query(`
+      INSERT INTO envios
+      (cliente_id, estado)
+      VALUES ($1, 'esperando_pago')
+      RETURNING *
+    `, [cliente_id]);
+
+    res.json({
+      ok: true,
+      envio: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error("Error creando envío desde orden:", error);
+    res.status(500).json({ error: "Error creando envío" });
+  }
+};
+
 module.exports = {
   getEnvioActivo,
   entregarEnvio,
