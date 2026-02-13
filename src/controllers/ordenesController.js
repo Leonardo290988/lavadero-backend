@@ -1013,7 +1013,7 @@ const eliminarServicioDeOrden = async (req, res) => {
 // GET /ordenes/cliente/:clienteId
 const getOrdenesCliente = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { clienteId } = req.params;
 
     const ordenesRes = await pool.query(`
       SELECT 
@@ -1021,13 +1021,13 @@ const getOrdenesCliente = async (req, res) => {
         o.estado,
         o.fecha_ingreso,
         o.tiene_envio,
-        COALESCE(SUM(os.cantidad * os.precio_unitario),0) AS total
+        COALESCE(o.total,0) AS total
       FROM ordenes o
       LEFT JOIN orden_servicios os ON os.orden_id = o.id
       WHERE o.cliente_id = $1
       GROUP BY o.id
       ORDER BY o.id DESC
-    `,[id]);
+    `,[clienteId]);
 
     const ordenes = ordenesRes.rows;
 
