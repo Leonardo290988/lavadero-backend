@@ -269,25 +269,34 @@ const crearEnvioDesdeOrden = async (req, res) => {
   try {
 
     const ordenRes = await pool.query(`
-      SELECT cliente_id
-      FROM ordenes
-      WHERE id = $1
-        AND estado = 'lista'
-        AND (tiene_envio = false OR tiene_envio IS NULL)
+      SELECT o.cliente_id, c.lat, c.lng, c.direccion
+      FROM ordenes o
+      JOIN clientes c ON c.id = o.cliente_id
+      WHERE o.id = $1
+        AND o.estado = 'lista'
+        AND (o.tiene_envio = false OR o.tiene_envio IS NULL)
     `, [orden_id]);
 
     if (ordenRes.rows.length === 0) {
       return res.status(400).json({ error: "Orden no válida para envío" });
     }
 
-    const cliente_id = ordenRes.rows[0].cliente_id;
+    const { cliente_id, lat, lng, direccion } = ordenRes.rows[0];
+
+    const zonaInfo = obtenerZonaCliente(lat, lng);
 
     const result = await pool.query(`
       INSERT INTO envios
-      (cliente_id, estado)
-      VALUES ($1, 'esperando_pago')
+      (cliente_id, orden_id, zona, direccion, precio, estado, tipo)
+      VALUES ($1,$2,$3,$4,$5,'esperando_pago','envio')
       RETURNING *
-    `, [cliente_id]);
+    `, [
+      cliente_id,
+      orden_id,
+      zonaInfo.zona,
+      direccion,
+      zonaInfo.precio
+    ]);
 
     res.json({
       ok: true,
