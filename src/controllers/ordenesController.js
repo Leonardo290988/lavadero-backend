@@ -1015,40 +1015,44 @@ const getOrdenesCliente = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await pool.query(`
+    const ordenesRes = await pool.query(`
       SELECT 
         o.id,
         o.estado,
         o.fecha_ingreso,
-        o.fecha_retiro,
         o.tiene_envio,
-        COALESCE(
-          json_agg(
-            json_build_object(
-              'servicio_id', os.servicio_id,
-              'cantidad', os.cantidad,
-              'precio_unitario', os.precio_unitario,
-              'subtotal', os.cantidad * os.precio_unitario
-            )
-          ) FILTER (WHERE os.id IS NOT NULL),
-          '[]'
-        ) AS detalles
+        COALESCE(SUM(os.cantidad * os.precio_unitario),0) AS total
       FROM ordenes o
       LEFT JOIN orden_servicios os ON os.orden_id = o.id
       WHERE o.cliente_id = $1
       GROUP BY o.id
       ORDER BY o.id DESC
-    `, [id]);
+    `,[id]);
 
-    res.json(result.rows);
+    const ordenes = ordenesRes.rows;
+
+    // 🔥 Ahora agregamos los detalles por cada orden
+    for (let orden of ordenes) {
+
+      const detallesRes = await pool.query(`
+        SELECT 
+          s.nombre AS servicio,
+          os.cantidad
+        FROM orden_servicios os
+        JOIN servicios s ON s.id = os.servicio_id
+        WHERE os.orden_id = $1
+      `,[orden.id]);
+
+      orden.detalles = detallesRes.rows;
+    }
+
+    res.json(ordenes);
 
   } catch (error) {
-    console.error("❌ ERROR GET ORDENES CLIENTE:", error);
-    res.status(500).json({ error: "Error al obtener órdenes" });
+    console.error(error);
+    res.status(500).json({ error: "Error obteniendo órdenes" });
   }
 };
-
-
 
 
 
