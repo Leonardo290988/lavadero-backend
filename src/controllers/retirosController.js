@@ -292,7 +292,9 @@ const marcarEnCamino = async (req,res)=>{
       return res.status(404).json({error:"Retiro no encontrado"});
     }
 
-    res.json({ok:true});
+    res.json({ok:true,
+             estado: "en_camino"
+    });
 
   } catch(error){
     console.error(error);
