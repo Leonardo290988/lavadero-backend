@@ -40,27 +40,46 @@ const webhookMercadoPago = async (req, res) => {
       return res.sendStatus(200);
     }
 
-    const { tipo, retiro_id } = pago.metadata;
+    const { tipo, retiro_id, envio_id  } = pago.metadata;
     const monto = pago.transaction_details.total_paid_amount;
 
     console.log("✅ Pago aprobado:", tipo, retiro_id);
 
-    if (!retiro_id) {
-      console.log("❌ retiro_id no encontrado en metadata");
-      return res.sendStatus(200);
-    }
+    if (tipo === "retiro" && retiro_id) {
 
-    // ===========================
-    // ACTUALIZAR RETIRO EXISTENTE
-    // ===========================
-    await pool.query(
-      `
-      UPDATE retiros
-      SET estado = 'pendiente'
-      WHERE id = $1
-      `,
-      [retiro_id]
-    );
+  await pool.query(`
+    UPDATE retiros
+    SET estado = 'pendiente'
+    WHERE id = $1
+  `, [retiro_id]);
+
+  console.log("🧺 Retiro habilitado:", retiro_id);
+
+}
+
+if (tipo === "envio" && envio_id) {
+
+  // 1️⃣ Pasar envío a pendiente
+  await pool.query(`
+    UPDATE envios
+    SET estado = 'pendiente'
+    WHERE id = $1
+  `, [envio_id]);
+
+  console.log("🚚 Envío habilitado:", envio_id);
+
+  // 2️⃣ Marcar orden como tiene_envio = true
+  await pool.query(`
+    UPDATE ordenes
+    SET tiene_envio = true
+    WHERE id = (
+      SELECT orden_id FROM envios WHERE id = $1
+    )
+  `, [envio_id]);
+
+  console.log("📦 Orden actualizada con envío");
+
+}
 
     console.log("🧺 Retiro habilitado:", retiro_id);
 
