@@ -301,6 +301,7 @@ const crearEnvioDesdeOrden = async (req, res) => {
 };
 
 module.exports = {
+  crearEnvioDesdeOrden,
   getEnvioActivo,
   entregarEnvio,
   getEnviosEntregados,
