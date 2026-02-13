@@ -1010,6 +1010,32 @@ const eliminarServicioDeOrden = async (req, res) => {
   }
 };
 
+// GET /ordenes/cliente/:clienteId
+const getOrdenesCliente = async (req, res) => {
+  const { clienteId } = req.params;
+
+  try {
+    const result = await pool.query(`
+      SELECT 
+        o.id,
+        o.estado,
+        o.fecha_ingreso,
+        o.fecha_retiro,
+        o.total,
+        o.tiene_envio
+      FROM ordenes o
+      WHERE o.cliente_id = $1
+      ORDER BY o.id DESC
+    `, [clienteId]);
+
+    res.json(result.rows);
+
+  } catch (error) {
+    console.error("❌ ERROR GET ORDENES CLIENTE:", error.message);
+    res.status(500).json({ error: "Error obteniendo órdenes" });
+  }
+};
+
 
 
 
@@ -1027,6 +1053,7 @@ module.exports = {
   crearOrden,
   agregarServicioAOrden,
   getServiciosDeOrden,
+  getOrdenesCliente,
   actualizarSenia,
   cerrarOrden,
   getOrdenesAbiertas,

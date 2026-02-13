@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const {
+  getOrdenesCliente,
   getRetirosHoy,
   getRetiros,
   eliminarServicioDeOrden,
@@ -28,7 +29,7 @@ console.log({
   getOrdenesAbiertas,
   getDetalleOrden   
 });
-
+router.get("/cliente/:clienteId", getOrdenesCliente);
 router.get('/abiertas', getOrdenesAbiertas);
 router.get('/retiradas', getOrdenesRetiradas);
 router.get("/:id/servicios", getServiciosOrden);
