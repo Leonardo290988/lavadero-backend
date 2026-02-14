@@ -136,60 +136,22 @@ const aceptarRetiro = async (req, res) => {
       return res.status(400).json({ error: "Retiro ya procesado" });
     }
 
-    // 2️⃣ Crear orden en estado ingresado
-    const ordenRes = await client.query(`
-      INSERT INTO ordenes
-      (cliente_id, estado, fecha_ingreso, tiene_envio)
-      VALUES ($1,'ingresado', (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires') , false)
-      RETURNING *
-    `,[retiro.cliente_id]);
-
-    const orden = ordenRes.rows[0];
-    let tieneEnvio = false;
-
-    // 3️⃣ Ver si existe envío prepago
-    const envioRes = await client.query(`
-      SELECT id
-      FROM envios
-      WHERE cliente_id=$1
-        AND estado='pendiente'
-        AND orden_id IS NULL
-      LIMIT 1
-    `,[retiro.cliente_id]);
-
-    if (envioRes.rows.length > 0) {
-      tieneEnvio = true;
-
-      await client.query(`
-        UPDATE ordenes
-        SET tiene_envio=true
-        WHERE id=$1
-      `,[orden.id]);
-
-      await client.query(`
-        UPDATE envios
-        SET orden_id=$1
-        WHERE id=$2
-      `,[orden.id, envioRes.rows[0].id]);
-    }
-
-    // 4️⃣ Actualizar retiro
+    // 2️⃣ SOLO cambiar estado a aceptado
     await client.query(`
       UPDATE retiros
-      SET estado='aceptado',
-          orden_id=$1
-      WHERE id=$2
-    `,[orden.id, id]);
+      SET estado='aceptado'
+      WHERE id=$1
+    `,[id]);
 
     await client.query("COMMIT");
 
-    // 5️⃣ Generar ticket provisorio AHORA
+    // 3️⃣ Generar ticket provisorio (sin orden todavía)
     const nombreArchivo = await generarTicketProvisorio({
-      id: orden.id,
+      id: retiro.id, // usamos el ID del retiro
       cliente: retiro.nombre,
       telefono: retiro.telefono,
       direccion: retiro.direccion,
-      tiene_envio: tieneEnvio
+      tiene_envio: false
     });
 
     res.json({
@@ -368,26 +330,60 @@ const getRetiroActivoCliente = async (req, res) => {
 // ===============================
 // MARCAR COMO RETIRADO
 // ===============================
-const marcarRetirado = async (req,res)=>{
+const marcarRetirado = async (req, res) => {
   const { id } = req.params;
+  const client = await pool.connect();
 
   try {
-    const r = await pool.query(`
-      UPDATE retiros
-      SET estado='retirado'
-      WHERE id=$1 AND estado='en_camino'
-      RETURNING *
-    `,[id]);
+    await client.query("BEGIN");
 
-    if(r.rows.length === 0){
-      return res.status(404).json({error:"Retiro no encontrado"});
+    // 1️⃣ Traer retiro
+    const retiroRes = await client.query(`
+      SELECT *
+      FROM retiros
+      WHERE id=$1 AND estado='en_camino'
+    `, [id]);
+
+    if (retiroRes.rows.length === 0) {
+      return res.status(404).json({ error: "Retiro no encontrado" });
     }
 
-    res.json({ok:true});
+    const retiro = retiroRes.rows[0];
 
-  } catch(error){
+    // 2️⃣ Cambiar estado a retirado
+    await client.query(`
+      UPDATE retiros
+      SET estado='retirado'
+      WHERE id=$1
+    `, [id]);
+
+    // 3️⃣ Crear orden RECIÉN AHORA
+    const ordenRes = await client.query(`
+      INSERT INTO ordenes
+      (cliente_id, estado, fecha_ingreso, tiene_envio)
+      VALUES ($1,'ingresado',(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'), false)
+      RETURNING *
+    `, [retiro.cliente_id]);
+
+    const orden = ordenRes.rows[0];
+
+    // 4️⃣ Asociar retiro a la orden
+    await client.query(`
+      UPDATE retiros
+      SET orden_id=$1
+      WHERE id=$2
+    `, [orden.id, id]);
+
+    await client.query("COMMIT");
+
+    res.json({ ok: true });
+
+  } catch (error) {
+    await client.query("ROLLBACK");
     console.error(error);
-    res.status(500).json({error:"Error marcando retirado"});
+    res.status(500).json({ error: "Error marcando retirado" });
+  } finally {
+    client.release();
   }
 };
 
