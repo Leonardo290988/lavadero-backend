@@ -330,7 +330,7 @@ const getRetiroActivoCliente = async (req, res) => {
 // ===============================
 // MARCAR COMO RETIRADO
 // ===============================
-const marcarRetirado = async (req, res) => {
+const marcarRetirado = async (req,res)=>{
   const { id } = req.params;
   const client = await pool.connect();
 
@@ -342,46 +342,75 @@ const marcarRetirado = async (req, res) => {
       SELECT *
       FROM retiros
       WHERE id=$1 AND estado='en_camino'
-    `, [id]);
+    `,[id]);
 
-    if (retiroRes.rows.length === 0) {
-      return res.status(404).json({ error: "Retiro no encontrado" });
+    if(retiroRes.rows.length === 0){
+      return res.status(404).json({error:"Retiro no encontrado"});
     }
 
     const retiro = retiroRes.rows[0];
 
-    // 2️⃣ Cambiar estado a retirado
-    await client.query(`
-      UPDATE retiros
-      SET estado='retirado'
-      WHERE id=$1
-    `, [id]);
-
-    // 3️⃣ Crear orden RECIÉN AHORA
+    // 2️⃣ Crear orden ahora
     const ordenRes = await client.query(`
       INSERT INTO ordenes
       (cliente_id, estado, fecha_ingreso, tiene_envio)
-      VALUES ($1,'ingresado',(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'), false)
+      VALUES ($1,'ingresado',(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'),false)
       RETURNING *
-    `, [retiro.cliente_id]);
+    `,[retiro.cliente_id]);
 
     const orden = ordenRes.rows[0];
 
-    // 4️⃣ Asociar retiro a la orden
+    let tieneEnvio = false;
+
+    // 3️⃣ Ver si existe envío prepago sin vincular
+    const envioRes = await client.query(`
+      SELECT id
+      FROM envios
+      WHERE cliente_id=$1
+        AND estado IN ('pendiente','aceptado')
+        AND orden_id IS NULL
+      LIMIT 1
+    `,[retiro.cliente_id]);
+
+    if(envioRes.rows.length > 0){
+
+      tieneEnvio = true;
+
+      // marcar orden con envío
+      await client.query(`
+        UPDATE ordenes
+        SET tiene_envio=true
+        WHERE id=$1
+      `,[orden.id]);
+
+      // vincular envío a orden
+      await client.query(`
+        UPDATE envios
+        SET orden_id=$1
+        WHERE id=$2
+      `,[orden.id, envioRes.rows[0].id]);
+    }
+
+    // 4️⃣ Actualizar retiro
     await client.query(`
       UPDATE retiros
-      SET orden_id=$1
+      SET estado='retirado',
+          orden_id=$1
       WHERE id=$2
-    `, [orden.id, id]);
+    `,[orden.id, id]);
 
     await client.query("COMMIT");
 
-    res.json({ ok: true });
+    res.json({
+      ok:true,
+      orden_id: orden.id,
+      tiene_envio: tieneEnvio
+    });
 
-  } catch (error) {
+  } catch(error){
     await client.query("ROLLBACK");
     console.error(error);
-    res.status(500).json({ error: "Error marcando retirado" });
+    res.status(500).json({error:"Error marcando retirado"});
   } finally {
     client.release();
   }
