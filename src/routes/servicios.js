@@ -14,7 +14,7 @@ const {
 // GET /servicios → DB
 router.get('/', getServicios);
 
-router.get("/servicios/publicos", getServiciosPublicos);
+router.get("/publicos", getServiciosPublicos);
 
 // POST /servicios → DB
 router.post('/', createServicio);
