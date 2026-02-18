@@ -183,7 +183,7 @@ const getOrdenesAbiertas = async (req, res) => {
     const ordenesResult = await pool.query(`
       SELECT
         o.id,
-        o.fecha_ingreso,
+        TO_CHAR(o.fecha_ingreso, 'YYYY-MM-DD HH24:MI:SS') AS fecha_ingreso,
         o.estado,
         o.senia,
         c.nombre AS cliente,
@@ -1019,7 +1019,7 @@ const getOrdenesCliente = async (req, res) => {
       SELECT 
         o.id,
         o.estado,
-        o.fecha_ingreso,
+        TO_CHAR(o.fecha_ingreso, 'YYYY-MM-DD HH24:MI:SS') AS fecha_ingreso,
         o.tiene_envio,
         COALESCE(o.total,0) AS total
       FROM ordenes o
