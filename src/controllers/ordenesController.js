@@ -426,7 +426,7 @@ const getDetalleOrden = async (req, res) => {
       SELECT
         o.id AS orden_id,
         o.estado,
-        o.fecha_ingreso,
+        TO_CHAR(o.fecha_ingreso, 'YYYY-MM-DD HH24:MI:SS') AS fecha_ingreso,
         o.fecha_retiro,
         o.senia,
         o.total,
