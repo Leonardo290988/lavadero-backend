@@ -169,6 +169,13 @@ const entregarEnvio = async (req, res) => {
       WHERE id=$1
     `, [id]);
 
+// 🔥 NUEVO: Marcar orden como entregada
+await client.query(`
+  UPDATE ordenes
+  SET estado='entregada'
+  WHERE id=$1
+`, [envio.orden_id]);
+
     // Registrar ingreso
     if (restante > 0) {
       await client.query(`
