@@ -1054,10 +1054,27 @@ const getOrdenesCliente = async (req, res) => {
   }
 };
 
+// GET /servicios/publicos
+const getServiciosPublicos = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, nombre, precio
+      FROM servicios
+      ORDER BY nombre ASC
+    `);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error obteniendo servicios:", error);
+    res.status(500).json({ error: "Error obteniendo servicios" });
+  }
+};
+
 
 
 module.exports = {
   imprimirTicket,
+  getServiciosPublicos,
   getOrdenesRetiradas,
   getServiciosOrden,
   getOrdenes,

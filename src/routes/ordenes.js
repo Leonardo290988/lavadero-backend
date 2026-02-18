@@ -5,6 +5,7 @@ const {
   getOrdenesCliente,
   getRetirosHoy,
   getRetiros,
+  getServiciosPublicos,
   eliminarServicioDeOrden,
   getServiciosDeOrden, 
   getServiciosOrden,
@@ -30,6 +31,7 @@ console.log({
   getDetalleOrden   
 });
 router.get("/cliente/:clienteId", getOrdenesCliente);
+router.get("/servicios/publicos", getServiciosPublicos);
 router.get('/abiertas', getOrdenesAbiertas);
 router.get('/retiradas', getOrdenesRetiradas);
 router.get("/:id/servicios", getServiciosOrden);
