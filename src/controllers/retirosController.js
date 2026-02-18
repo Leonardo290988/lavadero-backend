@@ -354,7 +354,7 @@ const marcarRetirado = async (req,res)=>{
     const ordenRes = await client.query(`
       INSERT INTO ordenes
       (cliente_id, estado, fecha_ingreso, tiene_envio)
-      VALUES ($1,'ingresado',NOW(),false)
+      VALUES ($1,'ingresado',(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'),false)
       RETURNING *
     `,[retiro.cliente_id]);
 
