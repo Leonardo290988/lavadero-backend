@@ -1,7 +1,7 @@
 const { Preference } = require("mercadopago");
 const mpClient = require("../config/mercadopago");
-const QRCode = require("qrcode");
 const axios = require("axios");
+const { v4: uuidv4 } = require("uuid");
 
 
 // =============================
@@ -9,22 +9,7 @@ const axios = require("axios");
 // =============================
 const crearPreferencia = async (req, res) => {
   try {
-
-    const {
-      titulo,
-      precio,
-      tipo,
-      retiro_id,
-      envio_id
-    } = req.body;
-
-    console.log("🧾 CREAR PREFERENCIA:", {
-      titulo,
-      precio,
-      tipo,
-      retiro_id,
-      envio_id
-    });
+    const { titulo, precio, tipo, retiro_id, envio_id } = req.body;
 
     const preference = new Preference(mpClient);
 
@@ -69,25 +54,33 @@ const crearPreferencia = async (req, res) => {
 
 
 // =======================================
-// 🔥 CREAR QR INTEROPERABLE REAL (T3.0)
+// 🔥 QR INTEROPERABLE REAL T3.0
 // =======================================
 const generarQR = async (req, res) => {
   try {
-    const { titulo, precio, tipo, retiro_id, envio_id } = req.body;
+    const { titulo, precio } = req.body;
 
-    const external_reference = `${tipo}_${retiro_id || envio_id}`;
-    const idempotencyKey = `${external_reference}_${Date.now()}`;
+    const idempotencyKey = uuidv4(); // obligatorio
 
     const response = await axios.post(
-      "https://api.mercadopago.com/v1/orders",
+      "https://api.mercadopago.com/instore/orders/qr/seller/collectors/" +
+        process.env.MP_USER_ID +
+        "/pos/102435387/qrs",
       {
-        type: "qr",
-        external_reference,
+        external_reference: uuidv4(),
+        title: titulo,
+        description: titulo,
+        total_amount: Number(precio),
         items: [
           {
+            sku_number: "1",
+            category: "service",
             title: titulo,
+            description: titulo,
             unit_price: Number(precio),
-            quantity: 1
+            quantity: 1,
+            unit_measure: "unit",
+            total_amount: Number(precio)
           }
         ],
         notification_url:
@@ -108,12 +101,15 @@ const generarQR = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error generando QR interoperable:", error.response?.data || error);
+    console.error(
+      "Error generando QR interoperable:",
+      error.response?.data || error
+    );
     res.status(500).json({ error: "Error generando QR" });
   }
 };
+
 module.exports = {
   generarQR,
   crearPreferencia
-
-}
+};
