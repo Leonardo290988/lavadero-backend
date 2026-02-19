@@ -126,3 +126,9 @@ const generarQR = async (req, res) => {
     res.status(500).json({ error: "Error generando QR interoperable" });
   }
 };
+
+module.exports = {
+  generarQR,
+  crearPreferencia
+
+}
