@@ -63,4 +63,41 @@ const crearPreferencia = async (req, res) => {
   }
 };
 
-module.exports = { crearPreferencia };
+const mercadopago = require("../config/mercadopago");
+
+const generarQR = async (req, res) => {
+  try {
+
+    const {
+      titulo,
+      precio,
+      tipo,
+      retiro_id,
+      envio_id
+    } = req.body;
+
+    const external_reference = `${tipo}_${retiro_id || envio_id}`;
+
+    const order = await mercadopago.orders.create({
+      type: "qr",
+      external_reference,
+      total_amount: Number(precio),
+      description: titulo,
+      notification_url:
+        "https://lavadero-backend-production-e1eb.up.railway.app/webhook/mercadopago"
+    });
+
+    res.json({
+      qr_image: order.body.qr_image,
+      qr_data: order.body.qr_data,
+      order_id: order.body.id
+    });
+
+  } catch (error) {
+    console.error("Error generando QR:", error);
+    res.status(500).json({ error: "Error generando QR" });
+  }
+};
+
+module.exports = { generarQR,
+                   crearPreferencia };
