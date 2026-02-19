@@ -77,6 +77,9 @@ const generarQR = async (req, res) => {
 
     const external_reference = `${tipo}_${retiro_id || envio_id}`;
 
+    // 🔥 Generamos clave única para idempotencia
+    const idempotencyKey = `${external_reference}_${Date.now()}`;
+
     const response = await axios.post(
       "https://api.mercadopago.com/v1/orders",
       {
@@ -90,7 +93,8 @@ const generarQR = async (req, res) => {
       {
         headers: {
           Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "X-Idempotency-Key": idempotencyKey
         }
       }
     );
@@ -105,7 +109,6 @@ const generarQR = async (req, res) => {
     res.status(500).json({ error: "Error generando QR" });
   }
 };
-
 module.exports = {
   generarQR,
   crearPreferencia
