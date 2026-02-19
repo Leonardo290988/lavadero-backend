@@ -1,5 +1,6 @@
 const { Preference } = require("mercadopago");
 const mpClient = require("../config/mercadopago");
+const QRCode = require("qrcode");
 
 const crearPreferencia = async (req, res) => {
   try {
@@ -63,7 +64,6 @@ const crearPreferencia = async (req, res) => {
   }
 };
 
-const mercadopago = require("../config/mercadopago");
 
 const generarQR = async (req, res) => {
   try {
@@ -76,21 +76,37 @@ const generarQR = async (req, res) => {
       envio_id
     } = req.body;
 
-    const external_reference = `${tipo}_${retiro_id || envio_id}`;
+    console.log("🧾 CREAR QR:", { titulo, precio });
 
-    const order = await mercadopago.orders.create({
-      type: "qr",
-      external_reference,
-      total_amount: Number(precio),
-      description: titulo,
-      notification_url:
-        "https://lavadero-backend-production-e1eb.up.railway.app/webhook/mercadopago"
+    const preference = new Preference(mpClient);
+
+    const result = await preference.create({
+      body: {
+        items: [
+          {
+            title: titulo,
+            unit_price: Number(precio),
+            quantity: 1
+          }
+        ],
+        metadata: {
+          tipo,
+          retiro_id: retiro_id || null,
+          envio_id: envio_id || null
+        },
+        notification_url:
+          "https://lavadero-backend-production-e1eb.up.railway.app/webhook/mercadopago"
+      }
     });
 
+    const data = result.body || result;
+
+    // 🔥 Generar QR con el link de pago
+    const qr_base64 = await QRCode.toDataURL(data.init_point);
+
     res.json({
-      qr_image: order.body.qr_image,
-      qr_data: order.body.qr_data,
-      order_id: order.body.id
+      ok: true,
+      qr_base64
     });
 
   } catch (error) {
