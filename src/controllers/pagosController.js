@@ -2,6 +2,7 @@ const { Preference } = require("mercadopago");
 const mpClient = require("../config/mercadopago");
 const axios = require("axios");
 const { v4: uuidv4 } = require("uuid");
+const jwt = require("jsonwebtoken");
 
 
 // =============================
@@ -60,12 +61,13 @@ const generarQR = async (req, res) => {
   try {
     const { titulo, precio } = req.body;
 
-    const idempotencyKey = uuidv4(); // obligatorio
+    const idempotencyKey = uuidv4();
+
+    const decoded = jwt.decode(process.env.MP_ACCESS_TOKEN);
+    const collectorId = decoded.user_id;
 
     const response = await axios.post(
-      "https://api.mercadopago.com/instore/orders/qr/seller/collectors/" +
-        process.env.MP_USER_ID +
-        "/pos/102435387/qrs",
+      `https://api.mercadopago.com/instore/orders/qr/seller/collectors/${collectorId}/pos/102435387/qrs`,
       {
         external_reference: uuidv4(),
         title: titulo,
