@@ -2,7 +2,6 @@ const { Preference } = require("mercadopago");
 const mpClient = require("../config/mercadopago");
 const axios = require("axios");
 const { v4: uuidv4 } = require("uuid");
-const jwt = require("jsonwebtoken");
 
 
 // =============================
@@ -63,8 +62,17 @@ const generarQR = async (req, res) => {
 
     const idempotencyKey = uuidv4();
 
-    const decoded = jwt.decode(process.env.MP_ACCESS_TOKEN);
-    const collectorId = decoded.user_id;
+    // 🔥 OBTENEMOS EL COLLECTOR ID REAL DESDE MP
+    const userResponse = await axios.get(
+      "https://api.mercadopago.com/users/me",
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`
+        }
+      }
+    );
+
+    const collectorId = userResponse.data.id;
 
     const response = await axios.post(
       `https://api.mercadopago.com/instore/orders/qr/seller/collectors/${collectorId}/pos/102435387/qrs`,
