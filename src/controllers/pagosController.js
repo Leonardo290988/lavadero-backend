@@ -73,26 +73,15 @@ const crearPreferencia = async (req, res) => {
 // =======================================
 const generarQR = async (req, res) => {
   try {
+    const { titulo, precio, tipo, retiro_id, envio_id } = req.body;
 
-    const {
-      titulo,
-      precio,
-      tipo,
-      retiro_id,
-      envio_id
-    } = req.body;
+    const external_reference = `${tipo}_${retiro_id || envio_id}`;
 
-    console.log("🧾 CREAR QR INTEROPERABLE:", {
-      titulo,
-      precio
-    });
-
-    // 👉 Crear orden QR real en Mercado Pago
     const response = await axios.post(
       "https://api.mercadopago.com/v1/orders",
       {
         type: "qr",
-        external_reference: `${tipo}_${retiro_id || envio_id}`,
+        external_reference,
         total_amount: Number(precio),
         description: titulo,
         notification_url:
@@ -106,24 +95,14 @@ const generarQR = async (req, res) => {
       }
     );
 
-    const qrData = response.data.qr_data;
-
-    if (!qrData) {
-      console.log("❌ Mercado Pago no devolvió qr_data");
-      return res.status(500).json({ error: "No se pudo generar QR real" });
-    }
-
-    // 👉 Convertimos el qr_data en imagen base64
-    const qr_base64 = await QRCode.toDataURL(qrData);
-
     res.json({
       ok: true,
-      qr_base64
+      qr_data: response.data.qr_data
     });
 
   } catch (error) {
-    console.error("❌ ERROR QR INTEROPERABLE:", error.response?.data || error.message);
-    res.status(500).json({ error: "Error generando QR interoperable" });
+    console.error("Error generando QR interoperable:", error.response?.data || error);
+    res.status(500).json({ error: "Error generando QR" });
   }
 };
 
