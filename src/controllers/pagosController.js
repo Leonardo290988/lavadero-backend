@@ -76,8 +76,6 @@ const generarQR = async (req, res) => {
     const { titulo, precio, tipo, retiro_id, envio_id } = req.body;
 
     const external_reference = `${tipo}_${retiro_id || envio_id}`;
-
-    // 🔥 Generamos clave única para idempotencia
     const idempotencyKey = `${external_reference}_${Date.now()}`;
 
     const response = await axios.post(
@@ -85,8 +83,13 @@ const generarQR = async (req, res) => {
       {
         type: "qr",
         external_reference,
-        total_amount: Number(precio),
-        description: titulo,
+        items: [
+          {
+            title: titulo,
+            unit_price: Number(precio),
+            quantity: 1
+          }
+        ],
         notification_url:
           "https://lavadero-backend-production-e1eb.up.railway.app/webhook/mercadopago"
       },
