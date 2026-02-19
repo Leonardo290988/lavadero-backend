@@ -1,9 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const { generarQR,
+const {
     crearPreferencia } = require("../controllers/pagosController");
 
 router.post("/crear-preferencia", crearPreferencia);
-router.post("/qr", generarQR);
 
 module.exports = router;
