@@ -35,8 +35,11 @@ function generarTicketOrden({
   doc.fontSize(10).text("Ticket de Ingreso", { align: "center" });
   doc.moveDown();
 
+
+  doc.moveDown(0.5);
+  doc.fontSize(28).text(`ORDEN N° ${id}`, { align: "center" });
+  doc.moveDown(0.5);   
   doc.fontSize(11);
-  doc.text(`Orden N°: ${id}`);
   doc.text(`Cliente: ${cliente}`);
   doc.text(`Tel: ${telefono || "-"}`);
   doc.text(`Fecha: ${new Date().toLocaleString("es-AR", { hour12: false})}`);
