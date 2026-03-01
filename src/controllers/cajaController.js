@@ -621,6 +621,35 @@ const imprimirResumenPorId = async (req, res) => {
   }
 };
 
+// ======================================
+// DETALLE MOVIMIENTOS POR TURNO
+// ======================================
+const getDetalleMovimientosTurno = async (req, res) => {
+  const { caja_id } = req.params;
+
+  try {
+    const result = await pool.query(`
+      SELECT
+        tipo,
+        descripcion,
+        monto,
+        forma_pago,
+        TO_CHAR(
+          creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires',
+          'DD/MM/YYYY HH24:MI:SS'
+        ) AS fecha
+      FROM caja_movimientos
+      WHERE caja_id = $1
+      ORDER BY creado_en DESC
+    `, [caja_id]);
+
+    res.json(result.rows);
+
+  } catch (error) {
+    console.error("ERROR detalle movimientos:", error);
+    res.status(500).json({ error: "Error obteniendo detalle" });
+  }
+};
 
     
 module.exports = {
@@ -633,6 +662,7 @@ module.exports = {
   imprimirPDFResumen,
   imprimirResumenPorId,
   getTurnos,
+  getDetalleMovimientosTurno,
   getResumenesDiarios,
   getResumenesSemanales,
   getResumenesMensuales

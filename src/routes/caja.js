@@ -24,6 +24,8 @@ router.get("/ultimo-cierre", cajaController.getUltimoCierre);
 // Turnos
 router.get("/turnos", cajaController.getTurnos);
 
+router.get("/movimientos/:caja_id", cajaController.getDetalleMovimientosTurno);
+
 // Resumen turno individual
 router.get("/resumen/turno/:caja_id", cajaController.getResumenTurno);
 
