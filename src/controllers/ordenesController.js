@@ -370,7 +370,7 @@ Tu orden Nº ${id} de Lavaderos Moreno ya está lista ✅
 
 🧺 Total: $${total}
 
-¡Te esperamos!
+¡Te esperamos en Hipólito Yrigoyen 1471 de Lunes a Sábados de 9hs a 18hs!
       `.trim();
 
       whatsapp_url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
@@ -400,7 +400,7 @@ const getOrdenesListasParaRetiro = async (req, res) => {
       SELECT
         o.id,
         c.nombre AS cliente,
-        o.fecha_ingreso,
+        TO_CHAR(o.fecha_ingreso, 'YYYY-MM-DD HH24:MI:SS') AS fecha_ingreso,
         o.total,
         o.senia,
         (o.total - COALESCE(o.senia,0)) AS total_a_pagar
