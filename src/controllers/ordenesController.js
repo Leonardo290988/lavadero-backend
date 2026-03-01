@@ -812,7 +812,7 @@ const getOrdenesRetiradas = async (req, res) => {
         c.nombre AS cliente,
         c.telefono,
         o.total,
-        o.fecha_retiro,
+        TO_CHAR(o.fecha_retiro, 'YYYY-MM-DD HH24:MI:SS') AS fecha_retiro,
         u.nombre AS usuario
         FROM ordenes o
 JOIN clientes c ON o.cliente_id = c.id
