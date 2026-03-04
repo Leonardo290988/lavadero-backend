@@ -222,6 +222,9 @@ const archivoPDF = await generarTicketPDF("turno", {
   caja: efectivoFinal
 });
 
+// 🔹 Obtener solo el nombre del archivo
+const nombreArchivo = path.basename(archivoPDF);
+
 await pool.query(`
   INSERT INTO resumenes
   (
@@ -255,15 +258,15 @@ await pool.query(`
   )
 `,
 [
-  caja.rows[0].fecha, // $1
-  caja.rows[0].turno, // $2
-  ingresos,           // $3
-  digital,            // $4
-  gastos,             // $5
-  guardado,           // $6
-  totalVentas,        // $7
-  efectivoFinal,      // $8
-  archivoPDF          // $9
+  caja.rows[0].fecha,
+  caja.rows[0].turno,
+  ingresos,
+  digital,
+  gastos,
+  guardado,
+  totalVentas,
+  efectivoFinal,
+  nombreArchivo
 ]);
 
 
@@ -450,7 +453,7 @@ await pool.query(`
   res.json({
   ok: true,
   efectivoFinal,
-  pdf: `/caja/pdf/turno/${archivoPDF}`
+  pdf: `/caja/pdf/turno/${nombreArchivo}`
 });
 
   } catch (error) {
@@ -611,8 +614,11 @@ const imprimirResumenPorId = async (req, res) => {
       return res.status(500).json({ error: "No se pudo generar el PDF" });
     }
 
+    // 🔹 Obtener solo el nombre del archivo
+    const nombreArchivo = path.basename(archivo);
+
     res.json({
-      pdf: `/caja/pdf/${resumen.tipo}/${archivo}`
+      pdf: `/caja/pdf/${resumen.tipo}/${nombreArchivo}`
     });
 
   } catch (error) {
