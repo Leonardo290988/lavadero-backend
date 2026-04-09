@@ -613,7 +613,7 @@ acolchados.forEach((p,idx)=>{
 totalItems -= Number(senia || 0);
 if (totalItems < 0) totalItems = 0;
 
-const archivoPDF = generarTicketRetiro({
+await generarTicketRetiro({
   id,
   cliente: ord.rows[0].cliente,
   items,
@@ -964,20 +964,6 @@ await generarTicketOrden({
   tiene_envio: orden.tiene_envio
 });
 
-await imprimirTicket({
-  id: orden.id,
-  cliente_id: orden.cliente_id,
-  cliente: orden.cliente,
-  telefono: orden.telefono,
-  items,
-  subtotal: subtotalReal,
-  promoDescuento,
-  senia,
-  total,
-  tiene_envio: orden.tiene_envio
-});
-
-
     console.log("✅ TICKET GENERADO");
 
     res.json({ ok: true });
@@ -1057,6 +1043,158 @@ const getOrdenesCliente = async (req, res) => {
 
 
 
+// ===============================
+// REIMPRIMIR TICKET ORDEN
+// ===============================
+const reimprimirTicketOrden = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Traer datos de la orden
+    const ordenRes = await pool.query(`
+      SELECT o.id, o.senia, o.total, o.tiene_envio,
+             c.nombre AS cliente, c.telefono
+      FROM ordenes o
+      JOIN clientes c ON c.id = o.cliente_id
+      WHERE o.id = $1
+    `, [id]);
+
+    if (ordenRes.rows.length === 0) {
+      return res.status(404).json({ error: "Orden no encontrada" });
+    }
+
+    const orden = ordenRes.rows[0];
+
+    const itemsRes = await pool.query(`
+      SELECT s.nombre AS descripcion,
+             os.cantidad,
+             os.precio_unitario AS precio
+      FROM orden_servicios os
+      JOIN servicios s ON s.id = os.servicio_id
+      WHERE os.orden_id = $1
+    `, [id]);
+
+    const items = itemsRes.rows;
+
+    // Recalcular totales (misma lógica que confirmarOrden)
+    let subtotalReal = 0;
+    let acolchados = [];
+
+    for (const s of items) {
+      if (s.descripcion.toLowerCase().includes("acolchado")) {
+        for (let x = 0; x < s.cantidad; x++) {
+          acolchados.push(Number(s.precio));
+        }
+      } else {
+        subtotalReal += Number(s.precio) * Number(s.cantidad);
+      }
+    }
+
+    acolchados.sort((a, b) => b - a);
+    let promoDescuento = 0;
+    acolchados.forEach((precio, index) => {
+      if ((index + 1) % 3 === 0) {
+        promoDescuento += precio;
+      } else {
+        subtotalReal += precio;
+      }
+    });
+
+    const senia = Number(orden.senia || 0);
+    const total = Number(orden.total || 0);
+
+    await generarTicketOrden({
+      id: orden.id,
+      cliente_id: null,
+      cliente: orden.cliente,
+      telefono: orden.telefono,
+      items,
+      subtotal: subtotalReal,
+      promoDescuento,
+      senia,
+      total,
+      tiene_envio: orden.tiene_envio
+    });
+
+    res.json({ ok: true, pdf: `/pdf/ordenes/orden_${id}.pdf` });
+
+  } catch (error) {
+    console.error("ERROR reimprimirTicketOrden:", error);
+    res.status(500).json({ error: "Error generando ticket" });
+  }
+};
+
+// ===============================
+// REIMPRIMIR TICKET RETIRO
+// ===============================
+const reimprimirTicketRetiro = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const ordenRes = await pool.query(`
+      SELECT o.id, o.senia, o.total, o.tiene_envio,
+             c.nombre AS cliente
+      FROM ordenes o
+      JOIN clientes c ON c.id = o.cliente_id
+      WHERE o.id = $1
+    `, [id]);
+
+    if (ordenRes.rows.length === 0) {
+      return res.status(404).json({ error: "Orden no encontrada" });
+    }
+
+    const orden = ordenRes.rows[0];
+
+    const itemsRes = await pool.query(`
+      SELECT s.nombre AS descripcion,
+             os.cantidad,
+             os.precio_unitario AS precio
+      FROM orden_servicios os
+      JOIN servicios s ON s.id = os.servicio_id
+      WHERE os.orden_id = $1
+    `, [id]);
+
+    const items = itemsRes.rows;
+
+    let totalItems = 0;
+    let acolchados = [];
+
+    for (const i of items) {
+      if (i.descripcion.toLowerCase().includes("acolchado")) {
+        for (let x = 0; x < i.cantidad; x++) {
+          acolchados.push(Number(i.precio));
+        }
+      } else {
+        totalItems += Number(i.precio) * Number(i.cantidad);
+      }
+    }
+
+    acolchados.sort((a, b) => b - a);
+    acolchados.forEach((p, idx) => {
+      if ((idx + 1) % 3 !== 0) totalItems += p;
+    });
+
+    const senia = Number(orden.senia || 0);
+    const subtotal = totalItems + senia;
+    const total = Number(orden.total || 0);
+
+    await generarTicketRetiro({
+      id,
+      cliente: orden.cliente,
+      items,
+      subtotal,
+      senia,
+      total
+    });
+
+    res.json({ ok: true, pdf: `/pdf/retiros/retiro_${id}.pdf` });
+
+  } catch (error) {
+    console.error("ERROR reimprimirTicketRetiro:", error);
+    res.status(500).json({ error: "Error generando ticket retiro" });
+  }
+};
+
 module.exports = {
   imprimirTicket,
   getOrdenesRetiradas,
@@ -1075,5 +1213,7 @@ module.exports = {
   cerrarOrden,
   getOrdenesAbiertas,
   eliminarServicioDeOrden,
-  confirmarOrden
+  confirmarOrden,
+  reimprimirTicketOrden,
+  reimprimirTicketRetiro
 };

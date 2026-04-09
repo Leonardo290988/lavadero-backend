@@ -29,6 +29,7 @@ app.use(express.json());
 // ARCHIVOS ESTÁTICOS
 // ========================
 app.use("/pdf", express.static(path.join(__dirname, "pdf")));
+app.use("/caja/pdf", express.static(path.join(__dirname, "pdf")));
 
 // ========================
 // RUTAS

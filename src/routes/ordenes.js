@@ -18,7 +18,9 @@ const {
   agregarServicioAOrden,
   getOrdenesAbiertas,
   actualizarSenia,
-  getDetalleOrden   
+  getDetalleOrden,
+  reimprimirTicketOrden,
+  reimprimirTicketRetiro
 } = require('../controllers/ordenesController');
 
 console.log({
@@ -45,4 +47,6 @@ router.put('/:id/cerrar', cerrarOrden);
 router.post('/:id/servicios', agregarServicioAOrden);
 router.get('/:id/servicios', getServiciosDeOrden);
 router.delete("/servicios/:id", eliminarServicioDeOrden);
+router.post("/:id/reimprimir-orden", reimprimirTicketOrden);
+router.post("/:id/reimprimir-retiro", reimprimirTicketRetiro);
 module.exports = router;

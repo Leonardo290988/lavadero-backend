@@ -2,9 +2,11 @@ const fs = require("fs");
 const path = require("path");
 const PDFDocument = require("pdfkit");
 
+const TEL_LAVADERO = "0237 15-555-5555"; // ✏️ Reemplazar con el número real
+
 const generarTicketPDF = async (tipo, datos) => {
 
-  // 📁 Carpeta donde se guardan PDFs
+  // 📁 Carpeta donde se guardan los PDFs
   const carpeta = path.join(process.cwd(), "src", "pdf", tipo);
 
   if (!fs.existsSync(carpeta)) {
@@ -13,8 +15,6 @@ const generarTicketPDF = async (tipo, datos) => {
 
   // 🧾 Nombre del archivo
   const archivo = `resumen_${tipo}_${Date.now()}.pdf`;
-
-  // 📍 Ruta completa solo para guardar
   const rutaArchivo = path.join(carpeta, archivo);
 
   return new Promise((resolve, reject) => {
@@ -28,35 +28,68 @@ const generarTicketPDF = async (tipo, datos) => {
     doc.pipe(stream);
 
     // =============================
-    // CONTENIDO PDF
+    // ENCABEZADO
     // =============================
-    doc.fontSize(16).text(`Resumen ${tipo.toUpperCase()}`, { align: "center" });
-    doc.moveDown();
+    doc.fontSize(16).text("LAVADEROS MORENO", { align: "center" });
+    doc.moveDown(0.3);
+    doc.fontSize(9).text(`Tel: ${TEL_LAVADERO}`, { align: "center" });
+    doc.moveDown(0.5);
+
+    const tituloTipo = {
+      turno: "Cierre de Turno",
+      diario: "Resumen Diario",
+      semanal: "Resumen Semanal",
+      mensual: "Resumen Mensual"
+    }[tipo] || `Resumen ${tipo.toUpperCase()}`;
+
+    doc.fontSize(13).text(tituloTipo, { align: "center" });
+    doc.moveDown(0.5);
 
     if (datos.periodo) {
-      doc.fontSize(11).text(`Periodo: ${datos.periodo}`);
-      doc.moveDown(0.5);
+      doc.fontSize(10).text(`Período: ${datos.periodo}`, { align: "center" });
     }
 
-    doc.fontSize(12).text(`Efectivo: $${datos.efectivo}`);
-    doc.text(`Digital: $${datos.digital}`);
-    doc.text(`Gastos: $${datos.gastos}`);
-    doc.text(`Guardado: $${datos.guardado}`);
+    doc.fontSize(9).text(
+      `Generado: ${new Date().toLocaleString("es-AR", { hour12: false })}`,
+      { align: "center" }
+    );
 
     doc.moveDown();
-    doc.fontSize(13).text(`TOTAL VENTAS: $${datos.total}`);
-    doc.text(`CAJA FINAL: $${datos.caja}`);
+    doc.text("------------------------------");
+    doc.moveDown(0.5);
+
+    // =============================
+    // DATOS
+    // =============================
+    doc.fontSize(11);
+    doc.text(`Efectivo:        $${Number(datos.efectivo || 0).toLocaleString("es-AR")}`);
+    doc.text(`Digital/MP:      $${Number(datos.digital || 0).toLocaleString("es-AR")}`);
+    doc.text(`Gastos:         -$${Number(datos.gastos || 0).toLocaleString("es-AR")}`);
+    doc.text(`Guardado:       -$${Number(datos.guardado || 0).toLocaleString("es-AR")}`);
+
+    doc.moveDown(0.5);
+    doc.text("------------------------------");
+    doc.moveDown(0.5);
+
+    doc.fontSize(13).text(
+      `TOTAL VENTAS: $${Number(datos.total || 0).toLocaleString("es-AR")}`,
+      { align: "center" }
+    );
+    doc.moveDown(0.3);
+    doc.fontSize(13).text(
+      `CAJA FINAL:   $${Number(datos.caja || 0).toLocaleString("es-AR")}`,
+      { align: "center" }
+    );
 
     doc.moveDown();
-    doc.fontSize(9).text("Sistema Lavadero");
-    doc.text("Resumen generado automáticamente");
+    doc.fontSize(8).text("Sistema Lavadero", { align: "center" });
+    doc.fontSize(8).text(`Tel: ${TEL_LAVADERO}`, { align: "center" });
 
-    doc.end();
-
-    // ✅ DEVOLVER SOLO NOMBRE
+    // ✅ Resolver solo cuando el archivo está completamente escrito
     stream.on("finish", () => resolve(archivo));
     stream.on("error", reject);
 
+    doc.end();
   });
 };
 
