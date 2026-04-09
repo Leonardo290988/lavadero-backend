@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const PDFDocument = require("pdfkit");
 
-const TEL_LAVADERO = "0237 15-555-5555"; // ✏️ Reemplazar con el número real
+const TEL_LAVADERO = "1122527099"; // ✏️ Reemplazar con el número real
 
 const generarTicketPDF = async (tipo, datos) => {
 
