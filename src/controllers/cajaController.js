@@ -95,8 +95,8 @@ const registrarMovimiento = async (req, res) => {
     await pool.query(
       `
       INSERT INTO caja_movimientos
-      (caja_id, tipo, descripcion, monto, forma_pago)
-      VALUES ($1,$2,$3,$4,$5)
+      (caja_id, tipo, descripcion, monto, forma_pago, creado_en)
+      VALUES ($1,$2,$3,$4,$5,(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'))
       `,
       [caja_id, tipo, descripcion, monto, forma_pago]
     );
@@ -584,7 +584,7 @@ const getDetalleMovimientosTurno = async (req, res) => {
         monto,
         forma_pago,
         TO_CHAR(
-          creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires',
+          creado_en,
           'DD/MM/YY HH24:MI'
         ) AS fecha
       FROM caja_movimientos
