@@ -4,7 +4,7 @@ const PDFDocument = require("pdfkit");
 
 const carpeta = path.join(__dirname, "../pdf/retiros");
 
-const TEL_LAVADERO = "0237 15-555-5555"; // ✏️ Reemplazar con el número real
+const TEL_LAVADERO = "1122527099"; // ✏️ Reemplazar con el número real
 
 function generarTicketRetiro({ id, cliente, items, subtotal, senia, total }) {
   return new Promise((resolve, reject) => {
