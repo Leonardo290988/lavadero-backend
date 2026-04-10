@@ -85,8 +85,8 @@ const fechaRetiroFinal = fecha_retiro || null;
     if (Number(senia) > 0) {
       await client.query(`
         INSERT INTO caja_movimientos
-        (caja_id, tipo, descripcion, monto, forma_pago)
-        VALUES ($1,'ingreso',$2,$3,'Efectivo')
+        (caja_id, tipo, descripcion, monto, forma_pago, creado_en)
+        VALUES ($1,'ingreso',$2,$3,'Efectivo',(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'))
       `,
         [
           caja_id,
@@ -787,8 +787,8 @@ const actualizarSenia = async (req, res) => {
 
       await client.query(`
         INSERT INTO caja_movimientos
-        (caja_id, tipo, descripcion, monto, forma_pago)
-        VALUES ($1,'ingreso',$2,$3,'Efectivo')
+        (caja_id, tipo, descripcion, monto, forma_pago, creado_en)
+        VALUES ($1,'ingreso',$2,$3,'Efectivo',(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'))
       `, [
         caja_id,
         `Seña orden #${id}`,
@@ -1020,29 +1020,62 @@ const getOrdenesCliente = async (req, res) => {
         o.estado,
         TO_CHAR(o.fecha_ingreso, 'YYYY-MM-DD HH24:MI:SS') AS fecha_ingreso,
         o.tiene_envio,
-        COALESCE(o.total,0) AS total
+        COALESCE(o.total, 0) AS total_cerrado,
+        COALESCE(o.senia, 0) AS senia
       FROM ordenes o
-      LEFT JOIN orden_servicios os ON os.orden_id = o.id
       WHERE o.cliente_id = $1
-      GROUP BY o.id
       ORDER BY o.id DESC
-    `,[clienteId]);
+    `, [clienteId]);
 
     const ordenes = ordenesRes.rows;
 
-    // 🔥 Ahora agregamos los detalles por cada orden
     for (let orden of ordenes) {
 
       const detallesRes = await pool.query(`
         SELECT 
           s.nombre AS servicio,
-          os.cantidad
+          os.cantidad,
+          os.precio_unitario
         FROM orden_servicios os
         JOIN servicios s ON s.id = os.servicio_id
         WHERE os.orden_id = $1
-      `,[orden.id]);
+      `, [orden.id]);
 
       orden.detalles = detallesRes.rows;
+
+      // Si la orden ya está cerrada (lista/confirmada/retirada/entregada),
+      // usar el total guardado. Si está abierta, calcularlo en vivo.
+      const estadosConTotalFinal = ['lista', 'retirada', 'entregada'];
+
+      if (estadosConTotalFinal.includes(orden.estado)) {
+        orden.total = Number(orden.total_cerrado);
+      } else {
+        // Calcular en vivo con promo 3x2 acolchados
+        let total = 0;
+        let acolchados = [];
+
+        for (const s of detallesRes.rows) {
+          if (s.servicio.toLowerCase().includes('acolchado')) {
+            for (let i = 0; i < s.cantidad; i++) {
+              acolchados.push(Number(s.precio_unitario));
+            }
+          } else {
+            total += Number(s.cantidad) * Number(s.precio_unitario);
+          }
+        }
+
+        acolchados.sort((a, b) => b - a);
+        acolchados.forEach((precio, index) => {
+          if ((index + 1) % 3 !== 0) total += precio;
+        });
+
+        total -= Number(orden.senia) || 0;
+        if (total < 0) total = 0;
+
+        orden.total = total;
+      }
+
+      delete orden.total_cerrado;
     }
 
     res.json(ordenes);
