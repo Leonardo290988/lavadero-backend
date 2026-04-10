@@ -34,8 +34,11 @@ router.get("/resumenes/diarios", cajaController.getResumenesDiarios);
 router.get("/resumenes/semanales", cajaController.getResumenesSemanales);
 router.get("/resumenes/mensuales", cajaController.getResumenesMensuales);
 
-// Imprimir resumen por ID
+// Imprimir resumen por ID (diario/semanal/mensual)
 router.get("/resumenes/imprimir/:id", cajaController.imprimirResumenPorId);
+
+// Imprimir resumen de turno por caja_id
+router.get("/resumenes/imprimir-turno/:caja_id", cajaController.imprimirResumenTurno);
 
 // PDFs
 router.get("/pdf/:tipo/:archivo", cajaController.imprimirPDFResumen);

@@ -270,175 +270,118 @@ await pool.query(`
 ]);
 
 
-    // ========= DIARIO =========
+    // ========= DIARIO + SEMANAL + MENSUAL (solo al cerrar turno tarde) =========
     if (caja.rows[0].turno === "tarde") {
 
-     const diarios = await pool.query(`
-  SELECT
-    COALESCE(SUM(ingresos_efectivo),0) efectivo,
-    COALESCE(SUM(ingresos_digital),0) digital,
-    COALESCE(SUM(gastos),0) gastos,
-    COALESCE(SUM(guardado),0) guardado,
-    COALESCE(SUM(total_ventas),0) total,
-    (
-      SELECT caja_final
-      FROM resumenes
-      WHERE tipo='turno'
-        AND fecha_desde = $1
-      ORDER BY id DESC
-      LIMIT 1
-    ) AS caja
-  FROM resumenes
-  WHERE tipo='turno'
-    AND fecha_desde = $1
-`, [caja.rows[0].fecha]);
+      // -- DIARIO --
+      const diarios = await pool.query(`
+        SELECT
+          COALESCE(SUM(ingresos_efectivo),0) efectivo,
+          COALESCE(SUM(ingresos_digital),0) digital,
+          COALESCE(SUM(gastos),0) gastos,
+          COALESCE(SUM(guardado),0) guardado,
+          COALESCE(SUM(total_ventas),0) total,
+          (
+            SELECT caja_final FROM resumenes
+            WHERE tipo='turno' AND fecha_desde = $1
+            ORDER BY id DESC LIMIT 1
+          ) AS caja
+        FROM resumenes
+        WHERE tipo='turno' AND fecha_desde = $1
+      `, [caja.rows[0].fecha]);
 
       const d = diarios.rows[0];
 
       await pool.query(`
         INSERT INTO resumenes
-        (tipo,fecha_desde,fecha_hasta,
-         ingresos_efectivo,ingresos_digital,
-         gastos,guardado,total_ventas,caja_final)
+        (tipo,fecha_desde,fecha_hasta,ingresos_efectivo,ingresos_digital,gastos,guardado,total_ventas,caja_final)
         VALUES ('diario',$1,$1,$2,$3,$4,$5,$6,$7)
-      `,
-      [
-        caja.rows[0].fecha,
-        d.efectivo,
-        d.digital,
-        d.gastos,
-        d.guardado,
-        d.total,
-        d.caja
-      ]);
+      `, [caja.rows[0].fecha, d.efectivo, d.digital, d.gastos, d.guardado, d.total, d.caja]);
 
       await generarTicketPDF("diario", {
         periodo: caja.rows[0].fecha,
-        efectivo: d.efectivo,
-        digital: d.digital,
-        gastos: d.gastos,
-        guardado: d.guardado,
-        total: d.total,
-        caja: d.caja
+        efectivo: d.efectivo, digital: d.digital,
+        gastos: d.gastos, guardado: d.guardado,
+        total: d.total, caja: d.caja
       });
-    }
 
-    // ========= SEMANAL =========
-    const fechaCaja = new Date(caja.rows[0].fecha + "12:00:00");
+      // -- SEMANAL: el sábado es día 6 en JS --
+      // FIX: usar " " entre fecha y hora para que new Date() sea válido
+      const fechaCaja = new Date(caja.rows[0].fecha + " 12:00:00");
+      const diaSemana = fechaCaja.getDay(); // 0=dom, 6=sáb
 
-    if (fechaCaja.getDay() === 6) {
+      if (diaSemana === 6) {
+        const semanal = await pool.query(`
+          SELECT
+            COALESCE(SUM(ingresos_efectivo),0) efectivo,
+            COALESCE(SUM(ingresos_digital),0) digital,
+            COALESCE(SUM(gastos),0) gastos,
+            COALESCE(SUM(guardado),0) guardado,
+            COALESCE(SUM(total_ventas),0) total,
+            (
+              SELECT caja_final FROM resumenes
+              WHERE tipo='diario'
+                AND fecha_desde BETWEEN DATE_TRUNC('week',$1::date) AND $1::date
+              ORDER BY fecha_desde DESC, id DESC LIMIT 1
+            ) AS caja
+          FROM resumenes
+          WHERE tipo='diario'
+            AND fecha_desde BETWEEN DATE_TRUNC('week',$1::date) AND $1::date
+        `, [caja.rows[0].fecha]);
 
-      const semanal = await pool.query(`
-  SELECT
-    COALESCE(SUM(ingresos_efectivo),0) efectivo,
-    COALESCE(SUM(ingresos_digital),0) digital,
-    COALESCE(SUM(gastos),0) gastos,
-    COALESCE(SUM(guardado),0) guardado,
-    COALESCE(SUM(total_ventas),0) total,
-    (
-      SELECT caja_final
-      FROM resumenes
-      WHERE tipo='diario'
-        AND fecha_desde BETWEEN
-            DATE_TRUNC('week',$1::date) AND $1::date
-      ORDER BY fecha_desde DESC, id DESC
-      LIMIT 1
-    ) AS caja
-  FROM resumenes
-  WHERE tipo='diario'
-    AND fecha_desde BETWEEN
-        DATE_TRUNC('week',$1::date) AND $1::date
-`, [caja.rows[0].fecha]);
+        const s = semanal.rows[0];
 
-      const s = semanal.rows[0];
+        await pool.query(`
+          INSERT INTO resumenes
+          (tipo,fecha_desde,fecha_hasta,ingresos_efectivo,ingresos_digital,gastos,guardado,total_ventas,caja_final)
+          VALUES ('semanal',$1,$1,$2,$3,$4,$5,$6,$7)
+        `, [caja.rows[0].fecha, s.efectivo, s.digital, s.gastos, s.guardado, s.total, s.caja]);
 
-      await pool.query(`
-        INSERT INTO resumenes
-        (tipo,fecha_desde,fecha_hasta,
-         ingresos_efectivo,ingresos_digital,
-         gastos,guardado,total_ventas,caja_final)
-        VALUES ('semanal',$1,$1,$2,$3,$4,$5,$6,$7)
-      `,
-      [
-        caja.rows[0].fecha,
-        s.efectivo,
-        s.digital,
-        s.gastos,
-        s.guardado,
-        s.total,
-        s.caja
-      ]);
+        await generarTicketPDF("semanal", {
+          periodo: caja.rows[0].fecha,
+          efectivo: s.efectivo, digital: s.digital,
+          gastos: s.gastos, guardado: s.guardado,
+          total: s.total, caja: s.caja
+        });
+      }
 
-      await generarTicketPDF("semanal", {
-        periodo: caja.rows[0].fecha,
-        efectivo: s.efectivo,
-        digital: s.digital,
-        gastos: s.gastos,
-        guardado: s.guardado,
-        total: s.total,
-        caja: s.caja
-      });
-    }
+      // -- MENSUAL: último día del mes --
+      const ultimoDia = new Date(fechaCaja.getFullYear(), fechaCaja.getMonth() + 1, 0).getDate();
 
-    // ========= MENSUAL =========
-    const ultimoDia = new Date(
-      fechaCaja.getFullYear(),
-      fechaCaja.getMonth() + 1,
-      0
-    ).getDate();
+      if (fechaCaja.getDate() === ultimoDia) {
+        const mensual = await pool.query(`
+          SELECT
+            COALESCE(SUM(ingresos_efectivo),0) efectivo,
+            COALESCE(SUM(ingresos_digital),0) digital,
+            COALESCE(SUM(gastos),0) gastos,
+            COALESCE(SUM(guardado),0) guardado,
+            COALESCE(SUM(total_ventas),0) total,
+            (
+              SELECT caja_final FROM resumenes
+              WHERE tipo='diario'
+                AND DATE_TRUNC('month',fecha_desde) = DATE_TRUNC('month',$1::date)
+              ORDER BY fecha_desde DESC, id DESC LIMIT 1
+            ) AS caja
+          FROM resumenes
+          WHERE tipo='diario'
+            AND DATE_TRUNC('month',fecha_desde) = DATE_TRUNC('month',$1::date)
+        `, [caja.rows[0].fecha]);
 
-    if (fechaCaja.getDate() === ultimoDia) {
+        const m = mensual.rows[0];
 
-      const mensual = await pool.query(`
-  SELECT
-    COALESCE(SUM(ingresos_efectivo),0) efectivo,
-    COALESCE(SUM(ingresos_digital),0) digital,
-    COALESCE(SUM(gastos),0) gastos,
-    COALESCE(SUM(guardado),0) guardado,
-    COALESCE(SUM(total_ventas),0) total,
-    (
-      SELECT caja_final
-      FROM resumenes
-      WHERE tipo='diario'
-        AND DATE_TRUNC('month',fecha_desde)
-            = DATE_TRUNC('month',$1::date)
-      ORDER BY fecha_desde DESC, id DESC
-      LIMIT 1
-    ) AS caja
-  FROM resumenes
-  WHERE tipo='diario'
-    AND DATE_TRUNC('month',fecha_desde)
-        = DATE_TRUNC('month',$1::date)
-`, [caja.rows[0].fecha]);
+        await pool.query(`
+          INSERT INTO resumenes
+          (tipo,fecha_desde,fecha_hasta,ingresos_efectivo,ingresos_digital,gastos,guardado,total_ventas,caja_final)
+          VALUES ('mensual',$1,$1,$2,$3,$4,$5,$6,$7)
+        `, [caja.rows[0].fecha, m.efectivo, m.digital, m.gastos, m.guardado, m.total, m.caja]);
 
-      const m = mensual.rows[0];
-
-      await pool.query(`
-        INSERT INTO resumenes
-        (tipo,fecha_desde,fecha_hasta,
-         ingresos_efectivo,ingresos_digital,
-         gastos,guardado,total_ventas,caja_final)
-        VALUES ('mensual',$1,$1,$2,$3,$4,$5,$6,$7)
-      `,
-      [
-        caja.rows[0].fecha,
-        m.efectivo,
-        m.digital,
-        m.gastos,
-        m.guardado,
-        m.total,
-        m.caja
-      ]);
-
-      await generarTicketPDF("mensual", {
-        periodo: caja.rows[0].fecha,
-        efectivo: m.efectivo,
-        digital: m.digital,
-        gastos: m.gastos,
-        guardado: m.guardado,
-        total: m.total,
-        caja: m.caja
-      });
+        await generarTicketPDF("mensual", {
+          periodo: caja.rows[0].fecha,
+          efectivo: m.efectivo, digital: m.digital,
+          gastos: m.gastos, guardado: m.guardado,
+          total: m.total, caja: m.caja
+        });
+      }
     }
 
     // ========= CIERRE =========
@@ -657,6 +600,58 @@ const getDetalleMovimientosTurno = async (req, res) => {
   }
 };
 
+// ======================================
+// IMPRIMIR RESUMEN DE TURNO POR CAJA_ID
+// ======================================
+const imprimirResumenTurno = async (req, res) => {
+  const { caja_id } = req.params;
+
+  try {
+    // Calcular datos del turno en vivo (igual que getResumenTurno)
+    const result = await pool.query(`
+      SELECT
+        COALESCE(SUM(CASE WHEN tipo='ingreso' AND forma_pago='Efectivo' THEN monto END),0) AS ingresos_efectivo,
+        COALESCE(SUM(CASE WHEN tipo='ingreso' AND forma_pago!='Efectivo' THEN monto END),0) AS transferencias,
+        COALESCE(SUM(CASE WHEN tipo='gasto' THEN monto END),0) AS gastos,
+        COALESCE(SUM(CASE WHEN tipo='guardado' THEN monto END),0) AS guardado
+      FROM caja_movimientos WHERE caja_id = $1
+    `, [caja_id]);
+
+    const caja = await pool.query(`
+      SELECT inicio_caja, fecha, turno FROM turnos_caja WHERE id = $1
+    `, [caja_id]);
+
+    if (caja.rows.length === 0) {
+      return res.status(404).json({ error: "Turno no encontrado" });
+    }
+
+    const inicio = Number(caja.rows[0].inicio_caja);
+    const ingresos = Number(result.rows[0].ingresos_efectivo);
+    const digital = Number(result.rows[0].transferencias);
+    const gastos = Number(result.rows[0].gastos);
+    const guardado = Number(result.rows[0].guardado);
+    const efectivoFinal = inicio + ingresos - gastos - guardado;
+    const totalVentas = ingresos + digital;
+
+    const archivo = await generarTicketPDF("turno", {
+      periodo: `${caja.rows[0].fecha} ${caja.rows[0].turno}`,
+      efectivo: ingresos,
+      digital,
+      gastos,
+      guardado,
+      total: totalVentas,
+      caja: efectivoFinal
+    });
+
+    const nombreArchivo = path.basename(archivo);
+    res.json({ pdf: `/caja/pdf/turno/${nombreArchivo}` });
+
+  } catch (error) {
+    console.error("ERROR imprimirResumenTurno:", error);
+    res.status(500).json({ error: "Error al imprimir resumen de turno" });
+  }
+};
+
     
 module.exports = {
   abrirCaja,
@@ -667,6 +662,7 @@ module.exports = {
   getResumenTurno,
   imprimirPDFResumen,
   imprimirResumenPorId,
+  imprimirResumenTurno,
   getTurnos,
   getDetalleMovimientosTurno,
   getResumenesDiarios,
