@@ -141,7 +141,7 @@ try {
   const caja = await pool.query(
    ` SELECT 
    to_char(
-  fecha AT TIME ZONE 'America/Argentina/Buenos_Aires',
+  fecha,
   'DD/MM/YY'
 )AS fecha, turno, inicio_caja 
      FROM turnos_caja 
