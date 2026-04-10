@@ -584,8 +584,8 @@ const getDetalleMovimientosTurno = async (req, res) => {
         monto,
         forma_pago,
         TO_CHAR(
-          creado_en,
-          'DD/MM/YYYY HH24:MI:SS'
+          creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires',
+          'DD/MM/YY HH24:MI'
         ) AS fecha
       FROM caja_movimientos
       WHERE caja_id = $1
