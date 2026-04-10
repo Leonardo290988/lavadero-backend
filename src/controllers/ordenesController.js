@@ -330,23 +330,36 @@ const cerrarOrden = async (req, res) => {
 
     // ===============================
     // 🚚 VINCULAR ENVÍO PREPAGO
+    // Solo aplica si tiene_envio=true Y el envío aún no está vinculado
+    // (en el flujo de retiro a domicilio, marcarRetirado ya lo vinculó)
     // ===============================
     if (ordenResult.rows[0].tiene_envio === true) {
-      await pool.query(`
-        UPDATE envios
-        SET orden_id = $1
-        WHERE id = (
-          SELECT id
-          FROM envios
-          WHERE cliente_id = $2
-            AND estado = 'pendiente'
-            AND orden_id IS NULL
-          ORDER BY id DESC
-          LIMIT 1
-        )
-      `, [id, ordenResult.rows[0].cliente_id]);
 
-      console.log("🚚 Envío vinculado a la orden");
+      // Verificar si ya hay un envío vinculado a esta orden
+      const envioYaVinculado = await pool.query(`
+        SELECT id FROM envios WHERE orden_id = $1 LIMIT 1
+      `, [id]);
+
+      if (envioYaVinculado.rows.length === 0) {
+        // No hay envío vinculado todavía — es el flujo de envío prepago directo
+        await pool.query(`
+          UPDATE envios
+          SET orden_id = $1
+          WHERE id = (
+            SELECT id
+            FROM envios
+            WHERE cliente_id = $2
+              AND estado = 'pendiente'
+              AND orden_id IS NULL
+            ORDER BY id DESC
+            LIMIT 1
+          )
+        `, [id, ordenResult.rows[0].cliente_id]);
+
+        console.log("🚚 Envío vinculado a la orden");
+      } else {
+        console.log("🚚 Envío ya estaba vinculado (flujo retiro a domicilio), sin cambios");
+      }
     }
 
     // ===============================

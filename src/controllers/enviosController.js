@@ -89,6 +89,7 @@ const getEnviosPendientes = async (req,res)=>{
     JOIN clientes c ON c.id = e.cliente_id
     WHERE e.estado='pendiente'
       AND e.orden_id IS NOT NULL
+      AND o.estado = 'lista'
     ORDER BY e.id ASC
   `);
 
