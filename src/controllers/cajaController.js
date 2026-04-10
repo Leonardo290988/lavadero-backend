@@ -142,7 +142,7 @@ try {
    ` SELECT 
    to_char(
   fecha AT TIME ZONE 'America/Argentina/Buenos_Aires',
-  'DD/MM/YYYY HH24:MI:SS'
+  'DD/MM/YY'
 )AS fecha, turno, inicio_caja 
      FROM turnos_caja 
      WHERE id=$1`,
