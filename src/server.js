@@ -45,6 +45,7 @@ app.use("/webhook", require("./routes/webhook"));
 app.use("/envios", require("./routes/envios"));
 app.use("/usuarios", require("./routes/usuarios"));
 app.use("/auth", require("./routes/auth"));
+app.use("/notificaciones", require("./routes/notificaciones"));
 
 // ========================
 // SERVER

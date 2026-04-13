@@ -2,7 +2,8 @@ const pool = require("../db");
 console.log("🔥 RETIROS CONTROLLER CARGADO 🔥");
 const generarTicketRetiro = require("../utils/generarTicketRetiro");
 const generarTicketProvisorio = require("../utils/generarTicketProvisorio");
-const  obtenerZonaCliente  = require("../helpers/zonaCliente");
+const obtenerZonaCliente = require("../helpers/zonaCliente");
+const enviarPushNotification = require("../helpers/enviarPushNotification");
 
 
 
@@ -68,6 +69,28 @@ const crearRetiroPrePago = async (req, res) => {
       );
 
       envioCreado = envioRes.rows[0];
+    }
+
+    // 🔔 Enviar push al local
+    try {
+      const clienteNombreRes = await pool.query(
+        "SELECT nombre FROM clientes WHERE id = $1", [cliente_id]
+      );
+      const nombreCliente = clienteNombreRes.rows[0]?.nombre || "Un cliente";
+      const tokenRes = await pool.query(
+        "SELECT token FROM push_tokens WHERE clave = 'local_owner'"
+      );
+      if (tokenRes.rows.length > 0) {
+        const tipoTexto = quiere_envio ? "Retiro + Envío" : "Retiro";
+        await enviarPushNotification(
+          tokenRes.rows[0].token,
+          `🧺 Nueva solicitud — ${tipoTexto}`,
+          `${nombreCliente} · Zona ${zonaInfo.zona} · $${zonaInfo.precio}`,
+          { tipo: "nueva_solicitud", cliente_id }
+        );
+      }
+    } catch (pushErr) {
+      console.error("⚠️ Error enviando push (no crítico):", pushErr.message);
     }
 
     res.json({

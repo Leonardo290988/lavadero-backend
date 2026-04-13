@@ -30,6 +30,19 @@ const createCliente = async (req, res) => {
   }
 
   try {
+    // 🔍 Verificar si el teléfono ya está registrado
+    if (telefono) {
+      const existente = await pool.query(
+        "SELECT id FROM clientes WHERE telefono = $1",
+        [telefono]
+      );
+      if (existente.rows.length > 0) {
+        return res.status(409).json({
+          error: "El número de teléfono ya está registrado. Iniciá sesión con ese número."
+        });
+      }
+    }
+
     // 📍 Geocodificar dirección
     const { lat, lng } = await geocodeDireccion(direccion);
 
