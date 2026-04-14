@@ -43,4 +43,7 @@ router.get("/resumenes/imprimir-turno/:caja_id", cajaController.imprimirResumenT
 // PDFs
 router.get("/pdf/:tipo/:archivo", cajaController.imprimirPDFResumen);
 
+// ⚡ ENDPOINT TEMPORAL — generar resúmenes históricos
+router.get("/generar-historicos", cajaController.generarResumenesHistoricos);
+
 module.exports = router;

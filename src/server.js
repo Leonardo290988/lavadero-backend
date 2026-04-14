@@ -4,11 +4,148 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const cron = require("node-cron");
+const pool = require("./db");
+const generarTicketPDF = require("./utils/generarTicketPDF");
 
 const app = express();
 
 console.log("🕒 Hora servidor:", new Date().toString());
 console.log("🔥🔥🔥 ESTE SERVER ES EL NUEVO 🔥🔥🔥");
+
+// ========================
+// CRON JOBS — RESÚMENES AUTOMÁTICOS
+// ========================
+
+// 📅 SEMANAL: todos los sábados a las 19:00 hs (Argentina)
+cron.schedule("0 19 * * 6", async () => {
+  console.log("⏰ CRON: generando resumen semanal...");
+  try {
+    const hoy = new Date().toISOString().slice(0, 10);
+
+    // Verificar que no exista ya uno esta semana
+    const existente = await pool.query(`
+      SELECT id FROM resumenes
+      WHERE tipo='semanal'
+        AND fecha_desde BETWEEN DATE_TRUNC('week',$1::date) AND $1::date
+      LIMIT 1
+    `, [hoy]);
+
+    if (existente.rows.length > 0) {
+      console.log("⏭️ Ya existe resumen semanal para esta semana, omitiendo.");
+      return;
+    }
+
+    const r = await pool.query(`
+      SELECT
+        COALESCE(SUM(ingresos_efectivo),0) efectivo,
+        COALESCE(SUM(ingresos_digital),0) digital,
+        COALESCE(SUM(gastos),0) gastos,
+        COALESCE(SUM(guardado),0) guardado,
+        COALESCE(SUM(total_ventas),0) total,
+        (
+          SELECT caja_final FROM resumenes
+          WHERE tipo='diario'
+            AND fecha_desde BETWEEN DATE_TRUNC('week',$1::date) AND $1::date
+          ORDER BY fecha_desde DESC, id DESC LIMIT 1
+        ) AS caja
+      FROM resumenes
+      WHERE tipo='diario'
+        AND fecha_desde BETWEEN DATE_TRUNC('week',$1::date) AND $1::date
+    `, [hoy]);
+
+    const s = r.rows[0];
+
+    if (!s || Number(s.total) === 0) {
+      console.log("⏭️ No hay datos diarios esta semana, omitiendo resumen semanal.");
+      return;
+    }
+
+    await pool.query(`
+      INSERT INTO resumenes
+      (tipo,fecha_desde,fecha_hasta,ingresos_efectivo,ingresos_digital,gastos,guardado,total_ventas,caja_final)
+      VALUES ('semanal',$1,$1,$2,$3,$4,$5,$6,$7)
+    `, [hoy, s.efectivo, s.digital, s.gastos, s.guardado, s.total, s.caja]);
+
+    await generarTicketPDF("semanal", {
+      periodo: hoy,
+      efectivo: s.efectivo, digital: s.digital,
+      gastos: s.gastos, guardado: s.guardado,
+      total: s.total, caja: s.caja
+    });
+
+    console.log("✅ Resumen semanal generado para:", hoy);
+  } catch (err) {
+    console.error("❌ Error generando resumen semanal:", err.message);
+  }
+}, { timezone: "America/Argentina/Buenos_Aires" });
+
+// 📅 MENSUAL: último día del mes a las 19:00 hs (Argentina)
+cron.schedule("0 19 28-31 * *", async () => {
+  try {
+    const hoy = new Date();
+    const ultimoDia = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+
+    if (hoy.getDate() !== ultimoDia) return; // Solo si es el último día real del mes
+
+    console.log("⏰ CRON: generando resumen mensual...");
+    const fechaStr = hoy.toISOString().slice(0, 10);
+
+    const existente = await pool.query(`
+      SELECT id FROM resumenes
+      WHERE tipo='mensual'
+        AND DATE_TRUNC('month',fecha_desde) = DATE_TRUNC('month',$1::date)
+      LIMIT 1
+    `, [fechaStr]);
+
+    if (existente.rows.length > 0) {
+      console.log("⏭️ Ya existe resumen mensual para este mes, omitiendo.");
+      return;
+    }
+
+    const r = await pool.query(`
+      SELECT
+        COALESCE(SUM(ingresos_efectivo),0) efectivo,
+        COALESCE(SUM(ingresos_digital),0) digital,
+        COALESCE(SUM(gastos),0) gastos,
+        COALESCE(SUM(guardado),0) guardado,
+        COALESCE(SUM(total_ventas),0) total,
+        (
+          SELECT caja_final FROM resumenes
+          WHERE tipo='diario'
+            AND DATE_TRUNC('month',fecha_desde) = DATE_TRUNC('month',$1::date)
+          ORDER BY fecha_desde DESC, id DESC LIMIT 1
+        ) AS caja
+      FROM resumenes
+      WHERE tipo='diario'
+        AND DATE_TRUNC('month',fecha_desde) = DATE_TRUNC('month',$1::date)
+    `, [fechaStr]);
+
+    const m = r.rows[0];
+
+    if (!m || Number(m.total) === 0) {
+      console.log("⏭️ No hay datos diarios este mes, omitiendo resumen mensual.");
+      return;
+    }
+
+    await pool.query(`
+      INSERT INTO resumenes
+      (tipo,fecha_desde,fecha_hasta,ingresos_efectivo,ingresos_digital,gastos,guardado,total_ventas,caja_final)
+      VALUES ('mensual',$1,$1,$2,$3,$4,$5,$6,$7)
+    `, [fechaStr, m.efectivo, m.digital, m.gastos, m.guardado, m.total, m.caja]);
+
+    await generarTicketPDF("mensual", {
+      periodo: fechaStr,
+      efectivo: m.efectivo, digital: m.digital,
+      gastos: m.gastos, guardado: m.guardado,
+      total: m.total, caja: m.caja
+    });
+
+    console.log("✅ Resumen mensual generado para:", fechaStr);
+  } catch (err) {
+    console.error("❌ Error generando resumen mensual:", err.message);
+  }
+}, { timezone: "America/Argentina/Buenos_Aires" });
 
 // ========================
 // MIDDLEWARES
