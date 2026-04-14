@@ -575,120 +575,6 @@ const imprimirResumenTurno = async (req, res) => {
   }
 };
 
-    
-// ======================================
-// GENERAR RESÚMENES HISTÓRICOS (uso único)
-// ======================================
-const generarResumenesHistoricos = async (req, res) => {
-  try {
-    const resultados = { semanales: 0, mensuales: 0 };
-
-    // --- SEMANALES ---
-    const semanas = await pool.query(`
-      SELECT
-        DATE_TRUNC('week', fecha_desde) AS semana,
-        MAX(fecha_desde) AS fecha,
-        SUM(ingresos_efectivo) AS efectivo,
-        SUM(ingresos_digital) AS digital,
-        SUM(gastos) AS gastos,
-        SUM(guardado) AS guardado,
-        SUM(total_ventas) AS total
-      FROM resumenes
-      WHERE tipo = 'diario'
-      GROUP BY DATE_TRUNC('week', fecha_desde)
-      ORDER BY semana ASC
-    `);
-
-    for (const s of semanas.rows) {
-      // Ver si ya existe
-      const existe = await pool.query(`
-        SELECT id FROM resumenes
-        WHERE tipo='semanal'
-          AND DATE_TRUNC('week', fecha_desde) = $1
-        LIMIT 1
-      `, [s.semana]);
-
-      if (existe.rows.length > 0) continue;
-
-      // Obtener caja_final del último diario de esa semana
-      const cajaFinal = await pool.query(`
-        SELECT caja_final FROM resumenes
-        WHERE tipo='diario'
-          AND DATE_TRUNC('week', fecha_desde) = $1
-        ORDER BY fecha_desde DESC LIMIT 1
-      `, [s.semana]);
-
-      await pool.query(`
-        INSERT INTO resumenes
-        (tipo,fecha_desde,fecha_hasta,ingresos_efectivo,ingresos_digital,gastos,guardado,total_ventas,caja_final)
-        VALUES ('semanal',$1,$1,$2,$3,$4,$5,$6,$7)
-      `, [
-        s.fecha,
-        s.efectivo, s.digital, s.gastos, s.guardado, s.total,
-        cajaFinal.rows[0]?.caja_final || 0
-      ]);
-
-      resultados.semanales++;
-    }
-
-    // --- MENSUALES ---
-    const meses = await pool.query(`
-      SELECT
-        DATE_TRUNC('month', fecha_desde) AS mes,
-        MAX(fecha_desde) AS fecha,
-        SUM(ingresos_efectivo) AS efectivo,
-        SUM(ingresos_digital) AS digital,
-        SUM(gastos) AS gastos,
-        SUM(guardado) AS guardado,
-        SUM(total_ventas) AS total
-      FROM resumenes
-      WHERE tipo = 'diario'
-      GROUP BY DATE_TRUNC('month', fecha_desde)
-      ORDER BY mes ASC
-    `);
-
-    for (const m of meses.rows) {
-      const existe = await pool.query(`
-        SELECT id FROM resumenes
-        WHERE tipo='mensual'
-          AND DATE_TRUNC('month', fecha_desde) = $1
-        LIMIT 1
-      `, [m.mes]);
-
-      if (existe.rows.length > 0) continue;
-
-      const cajaFinal = await pool.query(`
-        SELECT caja_final FROM resumenes
-        WHERE tipo='diario'
-          AND DATE_TRUNC('month', fecha_desde) = $1
-        ORDER BY fecha_desde DESC LIMIT 1
-      `, [m.mes]);
-
-      await pool.query(`
-        INSERT INTO resumenes
-        (tipo,fecha_desde,fecha_hasta,ingresos_efectivo,ingresos_digital,gastos,guardado,total_ventas,caja_final)
-        VALUES ('mensual',$1,$1,$2,$3,$4,$5,$6,$7)
-      `, [
-        m.fecha,
-        m.efectivo, m.digital, m.gastos, m.guardado, m.total,
-        cajaFinal.rows[0]?.caja_final || 0
-      ]);
-
-      resultados.mensuales++;
-    }
-
-    res.json({
-      ok: true,
-      mensaje: `Generados: ${resultados.semanales} semanales, ${resultados.mensuales} mensuales`,
-      ...resultados
-    });
-
-  } catch (error) {
-    console.error("ERROR generarResumenesHistoricos:", error);
-    res.status(500).json({ error: error.message });
-  }
-};
-
 module.exports = {
   abrirCaja,
   getCajaActual,
@@ -699,7 +585,6 @@ module.exports = {
   imprimirPDFResumen,
   imprimirResumenPorId,
   imprimirResumenTurno,
-  generarResumenesHistoricos,
   getTurnos,
   getDetalleMovimientosTurno,
   getResumenesDiarios,
