@@ -5,7 +5,7 @@ const login = async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT id, usuario, nombre 
+      `SELECT id, usuario, nombre, rol
        FROM usuarios
        WHERE usuario = $1
          AND password = $2
