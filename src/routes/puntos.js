@@ -1,10 +1,10 @@
 const express = require("express");
 const router = express.Router();
+const pool = require("../db");
 const { getPuntosCliente, canjearDescuento, getTodosLosPuntos } = require("../controllers/puntosController");
 
-router.get("/todos", getTodosLosPuntos);
+// Cargar puntos históricos desde órdenes retiradas (endpoint temporal)
 router.get("/cargar-historicos", async (req, res) => {
-  const pool = require("../db");
   try {
     const r = await pool.query(`
       INSERT INTO puntos_clientes (cliente_id, puntos_acumulados, total_gastado, ultima_actualizacion)
@@ -27,6 +27,8 @@ router.get("/cargar-historicos", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+router.get("/todos", getTodosLosPuntos);
 router.get("/cliente/:clienteId", getPuntosCliente);
 router.post("/canjear", canjearDescuento);
 
