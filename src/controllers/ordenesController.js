@@ -113,6 +113,55 @@ const fechaRetiroFinal = fecha_retiro || null;
 };
 
 // POST /ordenes/:id/servicios
+// ===============================
+// HELPER: Recalcular y guardar total de la orden
+// Se llama al agregar/eliminar servicios en orden confirmada
+// ===============================
+const recalcularTotalOrden = async (ordenId) => {
+  const ordenRes = await pool.query(
+    `SELECT estado, senia FROM ordenes WHERE id = $1`, [ordenId]
+  );
+  if (ordenRes.rows.length === 0) return;
+
+  const { estado, senia } = ordenRes.rows[0];
+
+  // Solo actualizar si la orden está confirmada (ya tiene total guardado)
+  if (estado !== 'confirmada') return;
+
+  const itemsRes = await pool.query(`
+    SELECT s.nombre AS descripcion, os.cantidad, os.precio_unitario AS precio
+    FROM orden_servicios os
+    JOIN servicios s ON s.id = os.servicio_id
+    WHERE os.orden_id = $1
+  `, [ordenId]);
+
+  let subtotal = 0;
+  let acolchados = [];
+
+  for (const s of itemsRes.rows) {
+    if (s.descripcion.toLowerCase().includes('acolchado')) {
+      for (let i = 0; i < s.cantidad; i++) acolchados.push(Number(s.precio));
+      subtotal += Number(s.precio) * Number(s.cantidad);
+    } else {
+      subtotal += Number(s.precio) * Number(s.cantidad);
+    }
+  }
+
+  acolchados.sort((a, b) => b - a);
+  let promoDescuento = 0;
+  acolchados.forEach((precio, index) => {
+    if ((index + 1) % 3 === 0) promoDescuento += precio;
+  });
+
+  let total = subtotal - promoDescuento - Number(senia || 0);
+  if (total < 0) total = 0;
+
+  await pool.query(
+    `UPDATE ordenes SET total = $1 WHERE id = $2`,
+    [total, ordenId]
+  );
+};
+
 const agregarServicioAOrden = async (req, res) => {
   const { id } = req.params;
   const { servicio_id, cantidad } = req.body;
@@ -143,6 +192,9 @@ const agregarServicioAOrden = async (req, res) => {
       `,
       [id, servicio_id, cantidad, precio]
     );
+
+    // Si la orden está confirmada, recalcular y actualizar el total
+    await recalcularTotalOrden(id);
 
     res.status(201).json({ ok: 'Servicio agregado a la orden' });
 
@@ -1000,6 +1052,9 @@ const eliminarServicioDeOrden = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Servicio no encontrado" });
     }
+
+    // Recalcular total de la orden
+    await recalcularTotalOrden(result.rows[0].orden_id);
 
     res.json({ ok: true });
 
