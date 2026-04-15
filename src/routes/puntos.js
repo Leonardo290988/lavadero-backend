@@ -1,7 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
-const { getPuntosCliente, canjearDescuento, getTodosLosPuntos } = require("../controllers/puntosController");
+
+// Importar funciones del controller de forma segura
+const puntosCtrl = require("../controllers/puntosController");
 
 // Cargar puntos históricos desde órdenes retiradas (endpoint temporal)
 router.get("/cargar-historicos", async (req, res) => {
@@ -28,8 +30,8 @@ router.get("/cargar-historicos", async (req, res) => {
   }
 });
 
-router.get("/todos", getTodosLosPuntos);
-router.get("/cliente/:clienteId", getPuntosCliente);
-router.post("/canjear", canjearDescuento);
+router.get("/todos", puntosCtrl.getTodosLosPuntos);
+router.get("/cliente/:clienteId", puntosCtrl.getPuntosCliente);
+router.post("/canjear", puntosCtrl.canjearDescuento);
 
 module.exports = router;

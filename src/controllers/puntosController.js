@@ -144,4 +144,27 @@ const canjearDescuento = async (req, res) => {
   }
 };
 
-module.exports = { getPuntosCliente, sumarPuntos, canjearDescuento };
+// ======================================
+// OBTENER TODOS LOS CLIENTES CON PUNTOS
+// ======================================
+const getTodosLosPuntos = async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT 
+        c.id,
+        c.nombre,
+        COALESCE(p.puntos_acumulados, 0) AS puntos_acumulados,
+        COALESCE(p.puntos_canjeados, 0) AS puntos_canjeados,
+        COALESCE(p.total_gastado, 0) AS total_gastado
+      FROM clientes c
+      LEFT JOIN puntos_clientes p ON p.cliente_id = c.id
+      ORDER BY puntos_acumulados DESC, c.nombre ASC
+    `);
+    res.json(r.rows);
+  } catch (error) {
+    console.error("ERROR getTodosLosPuntos:", error);
+    res.status(500).json({ error: "Error obteniendo puntos" });
+  }
+};
+
+module.exports = { getPuntosCliente, sumarPuntos, canjearDescuento, getTodosLosPuntos };
