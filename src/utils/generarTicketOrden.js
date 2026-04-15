@@ -4,7 +4,9 @@ const PDFDocument = require("pdfkit");
 
 const carpeta = path.join(__dirname, "../pdf/ordenes");
 
-const TEL_LAVADERO = "1122527099"; // ✏️ Reemplazar con el número real
+const TEL_LAVADERO = "0237 15-555-5555"; // ✏️ Reemplazar con el número real
+
+const LEYENDA_FINAL = "Si pasado los 30 días el pedido no es retirado se cobrará una multa, y pasados los 90 días no se aceptarán reclamos.";
 
 function generarTicketOrden({
   id,
@@ -27,7 +29,7 @@ function generarTicketOrden({
     const archivo = path.join(carpeta, `orden_${id}.pdf`);
 
     const doc = new PDFDocument({
-      size: [226, 600],
+      size: [226, 700],
       margin: 10
     });
 
@@ -60,18 +62,20 @@ function generarTicketOrden({
     doc.text("--------------------------------");
     doc.moveDown();
 
-    doc.text(`SUBTOTAL: $${subtotal}`);
+    doc.fontSize(11).text(`SUBTOTAL: $${subtotal}`);
 
     if (promoDescuento > 0) {
-      doc.text(`DESCUENTO PROMO: -$${promoDescuento}`);
+      doc.fontSize(11).text(`DESCUENTO PROMO: -$${promoDescuento}`);
     }
 
     if (senia > 0) {
-      doc.text(`SEÑA: -$${senia}`);
+      doc.fontSize(11).text(`SEÑA: -$${senia}`);
     }
 
     doc.moveDown();
-    doc.fontSize(14).text(`TOTAL: $${total}`, { align: "right" });
+    // ---- Total más grande y destacado ----
+    doc.fontSize(20).font("Helvetica-Bold").text(`TOTAL: $${total}`, { align: "center" });
+    doc.font("Helvetica");
 
     if (tiene_envio) {
       doc.moveDown();
@@ -83,7 +87,12 @@ function generarTicketOrden({
     doc.fontSize(9).text("Conserve este comprobante", { align: "center" });
     doc.fontSize(9).text(`Tel: ${TEL_LAVADERO}`, { align: "center" });
 
-    // Resolver la Promise solo cuando el archivo está completamente escrito
+    // ---- Leyenda legal al pie ----
+    doc.moveDown();
+    doc.moveTo(10, doc.y).lineTo(216, doc.y).stroke();
+    doc.moveDown(0.3);
+    doc.fontSize(7).text(LEYENDA_FINAL, { align: "center", width: 206 });
+
     stream.on("finish", () => resolve(archivo));
     stream.on("error", reject);
 

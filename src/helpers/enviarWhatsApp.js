@@ -1,19 +1,17 @@
 const enviarWhatsApp = async ({ telefono, nombre, ordenId, total, senia }) => {
   const saldo = Math.max(total - senia, 0);
 
-  const mensaje = `
-🧺 Lavaderos Moreno
+  const mensaje = `🧺 *Lavaderos Moreno*
 
-Hola ${nombre} 👋
-Tu pedido #${ordenId} ya está listo para retirar ✅
+Hola ${nombre}! 👋
+Tu orden *#${ordenId}* está lista y esperándote ✨
 
-💰 Total: $${total}
-💵 Seña: $${senia}
-➡️ Saldo: $${saldo}
+💵 Saldo a abonar al retirar: *$${saldo}*
 
-        ¡Te esperamos en Hipolito Yrigoyen 1471, Moreno!
-    Nuestros horarios de Atención Lunes a Sábados de 9hs a 18hs
-`;
+📍 Hipólito Yrigoyen 1471, Moreno
+🕐 Lunes a Sábados de 9 a 18hs
+
+⚠️ Recordá que pasados los 30 días se cobra una multa por almacenamiento.`;
 
   // 👉 POR AHORA SOLO LOGUEAMOS
   console.log('📲 WhatsApp a enviar:');

@@ -4,7 +4,9 @@ const PDFDocument = require("pdfkit");
 
 const carpeta = path.join(__dirname, "../pdf/retiros");
 
-const TEL_LAVADERO = "1122527099"; // ✏️ Reemplazar con el número real
+const TEL_LAVADERO = "0237 15-555-5555"; // ✏️ Reemplazar con el número real
+
+const LEYENDA_FINAL = "Si pasado los 30 días el pedido no es retirado se cobrará una multa, y pasados los 90 días no se aceptarán reclamos.";
 
 function generarTicketRetiro({ id, cliente, items, subtotal, senia, total }) {
   return new Promise((resolve, reject) => {
@@ -15,7 +17,7 @@ function generarTicketRetiro({ id, cliente, items, subtotal, senia, total }) {
 
     const archivo = path.join(carpeta, `retiro_${id}.pdf`);
 
-    const doc = new PDFDocument({ size: [226, 600], margin: 10 });
+    const doc = new PDFDocument({ size: [226, 700], margin: 10 });
 
     const stream = fs.createWriteStream(archivo);
     doc.pipe(stream);
@@ -43,20 +45,27 @@ function generarTicketRetiro({ id, cliente, items, subtotal, senia, total }) {
     doc.text("--------------------------");
     doc.moveDown();
 
-    doc.text(`SUBTOTAL: $${subtotal}`);
+    doc.fontSize(11).text(`SUBTOTAL: $${subtotal}`);
 
     if (senia > 0) {
-      doc.text(`SEÑA: -$${senia}`);
+      doc.fontSize(11).text(`SEÑA: -$${senia}`);
     }
 
     doc.moveDown();
-    doc.fontSize(11).text(`TOTAL A PAGAR: $${total}`, { align: "center" });
+    // ---- Total más grande y destacado ----
+    doc.fontSize(20).font("Helvetica-Bold").text(`TOTAL A PAGAR: $${total}`, { align: "center" });
+    doc.font("Helvetica");
 
     doc.moveDown();
     doc.fontSize(8).text("Gracias por su compra", { align: "center" });
     doc.fontSize(8).text(`Tel: ${TEL_LAVADERO}`, { align: "center" });
 
-    // Resolver solo cuando el archivo está completamente escrito
+    // ---- Leyenda legal al pie ----
+    doc.moveDown();
+    doc.moveTo(10, doc.y).lineTo(216, doc.y).stroke();
+    doc.moveDown(0.3);
+    doc.fontSize(7).text(LEYENDA_FINAL, { align: "center", width: 206 });
+
     stream.on("finish", () => resolve(archivo));
     stream.on("error", reject);
 
