@@ -42,7 +42,8 @@ const crearOrden = async (req, res) => {
       estado,
       fecha_retiro,
       senia = 0,
-      usuario_id
+      usuario_id,
+      descuento_fidelidad = 0
     } = req.body;
 
 
@@ -69,11 +70,11 @@ const fechaRetiroFinal = fecha_retiro || null;
 
     const result = await client.query(`
       INSERT INTO ordenes 
-      (cliente_id, estado, fecha_ingreso, fecha_retiro, senia, usuario_id)
-      VALUES ($1,$2,(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'),$3,$4,$5)
+      (cliente_id, estado, fecha_ingreso, fecha_retiro, senia, usuario_id, descuento_fidelidad)
+      VALUES ($1,$2,(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'),$3,$4,$5,$6)
       RETURNING *
     `,
-      [cliente_id, estado, fechaRetiroFinal, senia, usuario_id]
+      [cliente_id, estado, fechaRetiroFinal, senia, usuario_id, descuento_fidelidad]
     );
 
     const orden = result.rows[0];
@@ -367,7 +368,19 @@ const cerrarOrden = async (req, res) => {
       }
     });
 
-    // 3️⃣ Guardar total REAL
+    // 3️⃣ Guardar total REAL con descuento de fidelidad si aplica
+    const ordenInfo = await pool.query(`
+      SELECT descuento_fidelidad FROM ordenes WHERE id = $1
+    `, [id]);
+
+    const descuentoFidelidad = Number(ordenInfo.rows[0]?.descuento_fidelidad || 0);
+    if (descuentoFidelidad > 0) {
+      const descuentoMonto = Math.floor(total * descuentoFidelidad / 100);
+      total = total - descuentoMonto;
+      if (total < 0) total = 0;
+      console.log(`🏆 Descuento fidelidad ${descuentoFidelidad}% aplicado: -$${descuentoMonto}`);
+    }
+
     const ordenResult = await pool.query(`
       UPDATE ordenes
       SET total = $1,
@@ -429,16 +442,21 @@ const cerrarOrden = async (req, res) => {
       const cliente = clienteResult.rows[0];
       const telefono = cliente.telefono.replace(/\D/g, "");
 
-      const mensaje = `
-Hola ${cliente.nombre} 👋
-Tu orden Nº ${id} de Lavaderos Moreno ya está lista ✅
+      const saldoAPagar = Number(total);
+      const mensaje = `¡Hola ${cliente.nombre}! 😊
+¡Tu orden está lista! 🧺✨
 
-🧺 Total: $${total}
+📋 Orden Nº ${id} — *Lavaderos Moreno*
+${saldoAPagar > 0 ? `💰 Total: *$${saldoAPagar}*` : `✅ Saldo: *$0 (ya abonado)*`}
 
-¡Te esperamos en Hipólito Yrigoyen 1471 de Lunes a Sábados de 9hs a 18hs!
-      `.trim();
+Pasate cuando quieras por *Hipólito Yrigoyen 1471, Moreno*
+de Lunes a Sábados de 9 a 18hs 🕐
 
-      whatsapp_url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
+⚠️ _Recordá que pasados los 30 días se aplica una multa por almacenamiento._
+
+_¡Te esperamos!_`.trim();
+
+            whatsapp_url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
     }
 
     // ===============================
@@ -495,6 +513,7 @@ const getDetalleOrden = async (req, res) => {
         o.fecha_retiro,
         o.senia,
         o.total,
+        o.descuento_fidelidad,
         c.nombre AS cliente,
         u.nombre AS usuario,
         os.id AS orden_servicio_id,
@@ -525,6 +544,7 @@ const getDetalleOrden = async (req, res) => {
       fecha_retiro: base.fecha_retiro,
       senia: base.senia,
       total: base.total,
+      descuento_fidelidad: base.descuento_fidelidad || 0,
       servicios: result.rows
         .filter(r => r.servicio)
         .map(r => ({
@@ -581,6 +601,7 @@ const retirarOrden = async (req, res) => {
     const ord = await client.query(`
      SELECT o.total,
        o.senia,
+       o.cliente_id,
        c.nombre AS cliente
 FROM ordenes o
 JOIN clientes c ON c.id = o.cliente_id
@@ -642,6 +663,10 @@ WHERE o.id=$1
     }
 
     await client.query("COMMIT");
+
+    // 🏆 Sumar puntos al cliente por orden retirada y pagada
+    const { sumarPuntos } = require("./puntosController");
+    await sumarPuntos(ord.rows[0].cliente_id, total, pool);
 
  const itemsRes = await pool.query(`
   SELECT s.nombre AS descripcion,
