@@ -4,7 +4,7 @@ const PDFDocument = require("pdfkit");
 
 const carpeta = path.join(__dirname, "../pdf/ordenes");
 
-const TEL_LAVADERO = "0237 15-555-5555"; // ✏️ Reemplazar con el número real
+const TEL_LAVADERO = "1122527099"; // ✏️ Reemplazar con el número real
 
 const LEYENDA_FINAL = "Si pasado los 30 días el pedido no es retirado se cobrará una multa, y pasados los 90 días no se aceptarán reclamos.";
 
