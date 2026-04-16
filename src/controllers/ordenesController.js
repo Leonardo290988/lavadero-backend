@@ -443,19 +443,18 @@ const cerrarOrden = async (req, res) => {
       const cliente = clienteResult.rows[0];
       const telefono = cliente.telefono.replace(/\D/g, "");
 
-      const saldoAPagar = Number(total);
-      const mensaje = `¡Hola ${cliente.nombre}! 😊
-¡Tu orden está lista! 🧺✨
+      const saldoAPagar = Number(total) - Number(ordenResult.rows[0].senia || 0);
+      const mensaje = `🧺 *Lavaderos Moreno*
 
-📋 Orden Nº ${id} — *Lavaderos Moreno*
-${saldoAPagar > 0 ? `💰 Total: *$${saldoAPagar}*` : `✅ Saldo: *$0 (ya abonado)*`}
+Hola ${cliente.nombre}! 👋
+Tu orden *#${id}* está lista y esperándote ✨
 
-Pasate cuando quieras por *Hipólito Yrigoyen 1471, Moreno*
-de Lunes a Sábados de 9 a 18hs 🕐
+💵 Saldo a abonar al retirar: *$${Math.max(saldoAPagar, 0)}*
 
-⚠️ _Recordá que pasados los 30 días se aplica una multa por almacenamiento._
+📍 Hipólito Yrigoyen 1471, Moreno
+🕐 Lunes a Sábados de 9 a 18hs
 
-_¡Te esperamos!_`.trim();
+⚠️ Recordá que pasados los 30 días se cobra una multa por almacenamiento.`.trim();
 
             whatsapp_url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
     }
