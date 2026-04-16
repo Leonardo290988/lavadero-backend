@@ -23,7 +23,8 @@ const {
   reimprimirTicketRetiro,
   eliminarOrden,
   getOrdenesSinRetirar,
-  registrarRecordatorio
+  registrarRecordatorio,
+  actualizarNotas
 } = require('../controllers/ordenesController');
 
 console.log({
@@ -47,6 +48,7 @@ router.get("/:id/servicios", getServiciosOrden);
 router.get('/:id/detalle', getDetalleOrden);
 router.put('/:id/retirar', retirarOrden);
 router.put('/:id/senia', actualizarSenia);
+router.put('/:id/notas', actualizarNotas);
 router.put('/:id/cerrar', cerrarOrden);
 router.post('/:id/servicios', agregarServicioAOrden);
 router.get('/:id/servicios', getServiciosDeOrden);

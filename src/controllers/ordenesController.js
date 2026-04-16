@@ -240,6 +240,7 @@ const getOrdenesAbiertas = async (req, res) => {
         TO_CHAR(o.fecha_ingreso, 'YYYY-MM-DD HH24:MI:SS') AS fecha_ingreso,
         o.estado,
         o.senia,
+        o.notas,
         c.nombre AS cliente,
         o.tiene_envio,
         r.estado AS estado_retiro
@@ -248,8 +249,8 @@ const getOrdenesAbiertas = async (req, res) => {
       LEFT JOIN retiros r ON r.orden_id = o.id
       WHERE o.estado IN ('ingresado','confirmada')
         AND (
-              r.id IS NULL          -- orden creada manual
-              OR r.estado = 'retirado'  -- retiro ya traído al local
+              r.id IS NULL
+              OR r.estado = 'retirado'
             )
       ORDER BY o.fecha_ingreso DESC
     `);
@@ -298,7 +299,8 @@ const getOrdenesAbiertas = async (req, res) => {
         estado: o.estado,
         cliente: o.cliente,
         total,
-        tiene_envio: o.tiene_envio
+        tiene_envio: o.tiene_envio,
+        notas: o.notas || ""
       });
     }
 
@@ -516,6 +518,7 @@ const getDetalleOrden = async (req, res) => {
         o.senia,
         o.total,
         o.descuento_fidelidad,
+        o.notas,
         c.nombre AS cliente,
         u.nombre AS usuario,
         os.id AS orden_servicio_id,
@@ -547,6 +550,7 @@ const getDetalleOrden = async (req, res) => {
       senia: base.senia,
       total: base.total,
       descuento_fidelidad: base.descuento_fidelidad || 0,
+      notas: base.notas || "",
       servicios: result.rows
         .filter(r => r.servicio)
         .map(r => ({
@@ -1391,6 +1395,24 @@ const eliminarOrden = async (req, res) => {
 
 
 // ======================================
+// ACTUALIZAR NOTAS DE UNA ORDEN
+// ======================================
+const actualizarNotas = async (req, res) => {
+  const { id } = req.params;
+  const { notas } = req.body;
+  try {
+    await pool.query(
+      `UPDATE ordenes SET notas = $1 WHERE id = $2`,
+      [notas, id]
+    );
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("ERROR actualizarNotas:", error);
+    res.status(500).json({ error: "Error al guardar notas" });
+  }
+};
+
+// ======================================
 // ÓRDENES SIN RETIRAR (más de 10 días listas)
 // ======================================
 const getOrdenesSinRetirar = async (req, res) => {
@@ -1463,5 +1485,6 @@ module.exports = {
   reimprimirTicketRetiro,
   eliminarOrden,
   getOrdenesSinRetirar,
-  registrarRecordatorio
+  registrarRecordatorio,
+  actualizarNotas
 };
