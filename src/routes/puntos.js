@@ -5,7 +5,6 @@ const pool = require("../db");
 // Importar funciones del controller de forma segura
 const puntosCtrl = require("../controllers/puntosController");
 
-// Cargar puntos históricos desde órdenes retiradas (endpoint temporal)
 router.get("/cargar-historicos", async (req, res) => {
   try {
     const r = await pool.query(`
@@ -30,6 +29,7 @@ router.get("/cargar-historicos", async (req, res) => {
   }
 });
 
+router.get("/estadisticas", puntosCtrl.getEstadisticasPuntos);
 router.get("/todos", puntosCtrl.getTodosLosPuntos);
 router.get("/cliente/:clienteId", puntosCtrl.getPuntosCliente);
 router.post("/canjear", puntosCtrl.canjearDescuento);

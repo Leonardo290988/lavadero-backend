@@ -167,4 +167,49 @@ const getTodosLosPuntos = async (req, res) => {
   }
 };
 
-module.exports = { getPuntosCliente, sumarPuntos, canjearDescuento, getTodosLosPuntos };
+// ======================================
+// ESTADÍSTICAS DE PUNTOS
+// ======================================
+const getEstadisticasPuntos = async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE puntos_canjeados > 0) AS clientes_que_canjearon,
+        SUM(puntos_canjeados) AS total_puntos_canjeados,
+        SUM(puntos_acumulados) AS total_puntos_activos,
+        COUNT(*) FILTER (WHERE puntos_acumulados >= 100) AS clientes_con_descuento
+      FROM puntos_clientes
+    `);
+
+    // Calcular descuento total otorgado en pesos
+    // Estimamos el descuento promedio como 12% (entre 10%, 15% y 20%)
+    // Sobre el total gastado de los que canjearon
+    const descuentos = await pool.query(`
+      SELECT 
+        COALESCE(SUM(
+          CASE 
+            WHEN puntos_canjeados >= 200 THEN total_gastado * 0.20 * (puntos_canjeados / 200)
+            WHEN puntos_canjeados >= 150 THEN total_gastado * 0.15 * (puntos_canjeados / 150)
+            WHEN puntos_canjeados >= 100 THEN total_gastado * 0.10 * (puntos_canjeados / 100)
+            ELSE 0
+          END
+        ), 0) AS descuento_estimado_pesos
+      FROM puntos_clientes
+      WHERE puntos_canjeados > 0
+    `);
+
+    const stats = r.rows[0];
+    res.json({
+      clientes_que_canjearon: Number(stats.clientes_que_canjearon),
+      total_puntos_canjeados: Number(stats.total_puntos_canjeados),
+      total_puntos_activos: Number(stats.total_puntos_activos),
+      clientes_con_descuento: Number(stats.clientes_con_descuento),
+      descuento_estimado_pesos: Number(descuentos.rows[0].descuento_estimado_pesos)
+    });
+  } catch (error) {
+    console.error("ERROR getEstadisticasPuntos:", error);
+    res.status(500).json({ error: "Error" });
+  }
+};
+
+module.exports = { getPuntosCliente, sumarPuntos, canjearDescuento, getTodosLosPuntos, getEstadisticasPuntos };
