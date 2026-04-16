@@ -8,7 +8,7 @@ const TEL_LAVADERO = "1122527099"; // ✏️ Reemplazar con el número real
 
 const LEYENDA_FINAL = "Si pasado los 30 días el pedido no es retirado se cobrará una multa, y pasados los 90 días no se aceptarán reclamos.";
 
-function generarTicketRetiro({ id, cliente, items, subtotal, senia, total }) {
+function generarTicketRetiro({ id, cliente, items, subtotal, senia, multa = 0, total }) {
   return new Promise((resolve, reject) => {
 
     if (!fs.existsSync(carpeta)) {
@@ -49,6 +49,10 @@ function generarTicketRetiro({ id, cliente, items, subtotal, senia, total }) {
 
     if (senia > 0) {
       doc.fontSize(11).text(`SEÑA: -$${senia}`);
+    }
+
+    if (multa > 0) {
+      doc.fontSize(11).text(`MULTA ALMACENAMIENTO (+30 días): +$${multa}`);
     }
 
     doc.moveDown();

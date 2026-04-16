@@ -385,7 +385,8 @@ const cerrarOrden = async (req, res) => {
     const ordenResult = await pool.query(`
       UPDATE ordenes
       SET total = $1,
-          estado = 'lista'
+          estado = 'lista',
+          fecha_lista = (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires')
       WHERE id = $2
       RETURNING total, senia, cliente_id, tiene_envio
     `, [total, id]);
@@ -484,6 +485,7 @@ const getOrdenesListasParaRetiro = async (req, res) => {
         o.id,
         c.nombre AS cliente,
         TO_CHAR(o.fecha_ingreso, 'YYYY-MM-DD HH24:MI:SS') AS fecha_ingreso,
+        o.fecha_lista,
         o.total,
         o.senia,
         (o.total - COALESCE(o.senia,0)) AS total_a_pagar
@@ -602,6 +604,8 @@ const retirarOrden = async (req, res) => {
      SELECT o.total,
        o.senia,
        o.cliente_id,
+       o.fecha_ingreso,
+       o.fecha_lista,
        c.nombre AS cliente
 FROM ordenes o
 JOIN clientes c ON c.id = o.cliente_id
@@ -617,7 +621,20 @@ WHERE o.id=$1
 
     const total = Number(ord.rows[0].total);
     const senia = Number(ord.rows[0].senia) || 0;
-    const restante = total - senia;
+
+    // Calcular multa si pasaron más de 30 días desde que la orden quedó lista
+    let multa = 0;
+    if (ord.rows[0].fecha_lista) {
+      const diasLista = Math.floor(
+        (new Date() - new Date(ord.rows[0].fecha_lista)) / (1000 * 60 * 60 * 24)
+      );
+      if (diasLista > 30) {
+        multa = Math.floor(total * 0.10);
+        console.log(`⚠️ Multa por almacenamiento: ${diasLista} días → $${multa}`);
+      }
+    }
+
+    const restante = total + multa - senia;
 
     const caja = await client.query(`
       SELECT id
@@ -709,7 +726,8 @@ await generarTicketRetiro({
   items,
   subtotal: totalItems + senia,
   senia,
-  total: totalItems
+  multa,
+  total: totalItems + multa
 });
 
 // ❌ NO abrir PDF en servidor
@@ -719,7 +737,8 @@ res.json({
   ok: true,
   total: totalItems,
   senia,
-  restante,
+  multa,
+  restante: restante + multa,
   pdf: `/pdf/retiros/retiro_${id}.pdf`
 });
 
