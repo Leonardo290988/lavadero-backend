@@ -1,5 +1,6 @@
 const axios = require("axios");
 const pool = require("../db");
+const enviarPushNotification = require("../helpers/enviarPushNotification");
 
 const webhookMercadoPago = async (req, res) => {
   try {
@@ -58,6 +59,34 @@ const webhookMercadoPago = async (req, res) => {
       `, [retiro_id]);
 
       console.log("🧺 Retiro habilitado:", retiro_id);
+
+      // 🔔 Notificar al local ahora que el pago fue confirmado
+      try {
+        const retiroInfo = await pool.query(`
+          SELECT r.zona, r.precio, c.nombre, c.id AS cliente_id
+          FROM retiros r
+          JOIN clientes c ON c.id = r.cliente_id
+          WHERE r.id = $1
+        `, [retiro_id]);
+
+        if (retiroInfo.rows.length > 0) {
+          const { nombre, zona, precio } = retiroInfo.rows[0];
+          const tokenRes = await pool.query(
+            "SELECT token FROM push_tokens WHERE clave = 'local_owner'"
+          );
+          if (tokenRes.rows.length > 0) {
+            const tipoTexto = tipo === "retiro" ? "Retiro" : "Retiro + Envío";
+            await enviarPushNotification(
+              tokenRes.rows[0].token,
+              `🧺 Nueva solicitud — ${tipoTexto}`,
+              `${nombre} · Zona ${zona} · $${precio}`,
+              { tipo: "nueva_solicitud", retiro_id }
+            );
+          }
+        }
+      } catch (pushErr) {
+        console.error("⚠️ Error enviando push:", pushErr.message);
+      }
     }
 
     // ===========================
