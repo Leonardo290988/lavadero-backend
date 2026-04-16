@@ -1412,7 +1412,6 @@ const getOrdenesSinRetirar = async (req, res) => {
       WHERE o.estado = 'lista'
         AND o.fecha_lista IS NOT NULL
         AND o.fecha_lista < NOW() - INTERVAL '10 days'
-        AND (o.tiene_envio = false OR o.tiene_envio IS NULL)
       ORDER BY o.fecha_lista ASC
     `);
     res.json(r.rows);
