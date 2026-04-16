@@ -1321,6 +1321,44 @@ const reimprimirTicketRetiro = async (req, res) => {
   }
 };
 
+// ===============================
+// ELIMINAR ORDEN (solo admin, solo si está en estado ingresado o confirmada)
+// ===============================
+const eliminarOrden = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Verificar que la orden existe y su estado
+    const ordenRes = await pool.query(
+      `SELECT id, estado FROM ordenes WHERE id = $1`, [id]
+    );
+
+    if (ordenRes.rows.length === 0) {
+      return res.status(404).json({ error: "Orden no encontrada" });
+    }
+
+    const estado = ordenRes.rows[0].estado;
+
+    if (!['ingresado', 'confirmada'].includes(estado)) {
+      return res.status(400).json({
+        error: `No se puede eliminar una orden en estado "${estado}". Solo se pueden eliminar órdenes ingresadas o confirmadas.`
+      });
+    }
+
+    // Eliminar servicios de la orden primero
+    await pool.query(`DELETE FROM orden_servicios WHERE orden_id = $1`, [id]);
+
+    // Eliminar la orden
+    await pool.query(`DELETE FROM ordenes WHERE id = $1`, [id]);
+
+    res.json({ ok: true, mensaje: `Orden #${id} eliminada correctamente` });
+
+  } catch (error) {
+    console.error("ERROR eliminarOrden:", error);
+    res.status(500).json({ error: "Error al eliminar la orden" });
+  }
+};
+
 module.exports = {
   imprimirTicket,
   getOrdenesRetiradas,
@@ -1341,5 +1379,6 @@ module.exports = {
   eliminarServicioDeOrden,
   confirmarOrden,
   reimprimirTicketOrden,
-  reimprimirTicketRetiro
+  reimprimirTicketRetiro,
+  eliminarOrden
 };

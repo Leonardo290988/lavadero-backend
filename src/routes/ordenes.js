@@ -20,7 +20,8 @@ const {
   actualizarSenia,
   getDetalleOrden,
   reimprimirTicketOrden,
-  reimprimirTicketRetiro
+  reimprimirTicketRetiro,
+  eliminarOrden
 } = require('../controllers/ordenesController');
 
 console.log({
@@ -49,4 +50,5 @@ router.get('/:id/servicios', getServiciosDeOrden);
 router.delete("/servicios/:id", eliminarServicioDeOrden);
 router.post("/:id/reimprimir-orden", reimprimirTicketOrden);
 router.post("/:id/reimprimir-retiro", reimprimirTicketRetiro);
+router.delete("/:id", eliminarOrden);
 module.exports = router;
