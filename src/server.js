@@ -184,6 +184,7 @@ app.use("/usuarios", require("./routes/usuarios"));
 app.use("/auth", require("./routes/auth"));
 app.use("/notificaciones", require("./routes/notificaciones"));
 app.use("/puntos", require("./routes/puntos"));
+app.use("/estadisticas", require("./routes/estadisticas"));
 
 // ========================
 // SERVER
