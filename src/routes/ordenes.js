@@ -21,7 +21,9 @@ const {
   getDetalleOrden,
   reimprimirTicketOrden,
   reimprimirTicketRetiro,
-  eliminarOrden
+  eliminarOrden,
+  getOrdenesSinRetirar,
+  registrarRecordatorio
 } = require('../controllers/ordenesController');
 
 console.log({
@@ -51,4 +53,6 @@ router.delete("/servicios/:id", eliminarServicioDeOrden);
 router.post("/:id/reimprimir-orden", reimprimirTicketOrden);
 router.post("/:id/reimprimir-retiro", reimprimirTicketRetiro);
 router.delete("/:id", eliminarOrden);
+router.get("/sin-retirar", getOrdenesSinRetirar);
+router.post("/:ordenId/recordatorio", registrarRecordatorio);
 module.exports = router;

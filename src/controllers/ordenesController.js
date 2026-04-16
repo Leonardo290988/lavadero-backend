@@ -1389,6 +1389,58 @@ const eliminarOrden = async (req, res) => {
   }
 };
 
+
+// ======================================
+// ÓRDENES SIN RETIRAR (más de 10 días listas)
+// ======================================
+const getOrdenesSinRetirar = async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT
+        o.id,
+        c.nombre AS cliente,
+        c.telefono,
+        o.total,
+        o.senia,
+        (o.total - COALESCE(o.senia, 0)) AS saldo,
+        o.fecha_lista,
+        rr.ultimo_recordatorio,
+        EXTRACT(DAY FROM NOW() - o.fecha_lista)::INTEGER AS dias_lista
+      FROM ordenes o
+      JOIN clientes c ON c.id = o.cliente_id
+      LEFT JOIN recordatorios_retiro rr ON rr.orden_id = o.id
+      WHERE o.estado = 'lista'
+        AND o.fecha_lista IS NOT NULL
+        AND o.fecha_lista < NOW() - INTERVAL '10 days'
+        AND (o.tiene_envio = false OR o.tiene_envio IS NULL)
+      ORDER BY o.fecha_lista ASC
+    `);
+    res.json(r.rows);
+  } catch (error) {
+    console.error("ERROR getOrdenesSinRetirar:", error);
+    res.status(500).json({ error: "Error obteniendo órdenes sin retirar" });
+  }
+};
+
+// ======================================
+// REGISTRAR RECORDATORIO DE RETIRO
+// ======================================
+const registrarRecordatorio = async (req, res) => {
+  const { ordenId } = req.params;
+  try {
+    await pool.query(`
+      INSERT INTO recordatorios_retiro (orden_id, ultimo_recordatorio)
+      VALUES ($1, NOW())
+      ON CONFLICT (orden_id) DO UPDATE
+        SET ultimo_recordatorio = NOW()
+    `, [ordenId]);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("ERROR registrarRecordatorio:", error);
+    res.status(500).json({ error: "Error registrando recordatorio" });
+  }
+};
+
 module.exports = {
   imprimirTicket,
   getOrdenesRetiradas,
@@ -1410,5 +1462,7 @@ module.exports = {
   confirmarOrden,
   reimprimirTicketOrden,
   reimprimirTicketRetiro,
-  eliminarOrden
+  eliminarOrden,
+  getOrdenesSinRetirar,
+  registrarRecordatorio
 };
