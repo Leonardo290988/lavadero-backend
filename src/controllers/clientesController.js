@@ -169,3 +169,57 @@ module.exports = {
   buscarClientes,
   createCliente
 };
+// ======================================
+// CLIENTES INACTIVOS (sin órdenes en 45 días)
+// ======================================
+const getClientesInactivos = async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT 
+        c.id,
+        c.nombre,
+        c.telefono,
+        MAX(o.fecha_ingreso) AS ultima_orden,
+        COUNT(o.id) AS total_ordenes,
+        cc.ultimo_contacto
+      FROM clientes c
+      LEFT JOIN ordenes o ON o.cliente_id = c.id
+      LEFT JOIN clientes_contactados cc ON cc.cliente_id = c.id
+      WHERE c.telefono IS NOT NULL AND c.telefono != ''
+      GROUP BY c.id, c.nombre, c.telefono, cc.ultimo_contacto
+      HAVING 
+        MAX(o.fecha_ingreso) < NOW() - INTERVAL '45 days'
+        OR MAX(o.fecha_ingreso) IS NULL
+      ORDER BY ultima_orden ASC NULLS FIRST
+    `);
+    res.json(r.rows);
+  } catch (error) {
+    console.error("ERROR getClientesInactivos:", error);
+    res.status(500).json({ error: "Error obteniendo clientes inactivos" });
+  }
+};
+
+// ======================================
+// MARCAR CLIENTE COMO CONTACTADO
+// ======================================
+const marcarContactado = async (req, res) => {
+  const { clienteId } = req.params;
+  try {
+    await pool.query(`
+      INSERT INTO clientes_contactados (cliente_id, ultimo_contacto)
+      VALUES ($1, NOW())
+      ON CONFLICT (cliente_id) DO UPDATE
+        SET ultimo_contacto = NOW()
+    `, [clienteId]);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("ERROR marcarContactado:", error);
+    res.status(500).json({ error: "Error marcando contacto" });
+  }
+};
+
+module.exports = {
+  ...module.exports,
+  getClientesInactivos,
+  marcarContactado
+};
