@@ -32,7 +32,15 @@ const getDiasMasMovidos = async (req, res) => {
   try {
     const r = await pool.query(`
       SELECT 
-        TO_CHAR(fecha_ingreso AT TIME ZONE 'America/Argentina/Buenos_Aires', 'Day') AS dia_nombre,
+        CASE EXTRACT(DOW FROM fecha_ingreso AT TIME ZONE 'America/Argentina/Buenos_Aires')
+          WHEN 0 THEN 'Domingo'
+          WHEN 1 THEN 'Lunes'
+          WHEN 2 THEN 'Martes'
+          WHEN 3 THEN 'Miércoles'
+          WHEN 4 THEN 'Jueves'
+          WHEN 5 THEN 'Viernes'
+          WHEN 6 THEN 'Sábado'
+        END AS dia_nombre,
         EXTRACT(DOW FROM fecha_ingreso AT TIME ZONE 'America/Argentina/Buenos_Aires') AS dia_num,
         COUNT(*) AS total_ordenes,
         ROUND(AVG(total)::numeric, 0) AS ticket_promedio
