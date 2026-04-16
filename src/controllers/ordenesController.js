@@ -1249,6 +1249,11 @@ const reimprimirTicketOrden = async (req, res) => {
       tiene_envio: orden.tiene_envio
     });
 
+    await generarTicketRopa({
+      id: orden.id,
+      cliente: orden.cliente
+    });
+
     res.json({ ok: true, pdf: `/pdf/ordenes/orden_${id}.pdf` });
 
   } catch (error) {
