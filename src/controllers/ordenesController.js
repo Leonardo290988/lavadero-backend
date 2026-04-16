@@ -2,6 +2,7 @@ const pool = require('../db');
 const enviarWhatsApp = require('../helpers/enviarWhatsApp');
 const generarTicketOrden = require("../utils/generarTicketOrden");
 const imprimirTicket = require("../utils/imprimirTicket");
+const generarTicketRopa = require("../utils/generarTicketRopa");
 const generarTicketRetiro = require("../utils/generarTicketRetiro");
 const { exec } = require("child_process");
 // GET /ordenes
@@ -1054,7 +1055,13 @@ await generarTicketOrden({
   tiene_envio: orden.tiene_envio
 });
 
-    console.log("✅ TICKET GENERADO");
+    // Generar ticket de ropa (solo número de orden y nombre)
+    await generarTicketRopa({
+      id: orden.id,
+      cliente: orden.cliente
+    });
+
+    console.log("✅ TICKETS GENERADOS");
 
     res.json({ ok: true });
 
