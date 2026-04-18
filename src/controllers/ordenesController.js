@@ -610,6 +610,7 @@ const retirarOrden = async (req, res) => {
        o.cliente_id,
        o.fecha_ingreso,
        o.fecha_lista,
+       o.estado,
        c.nombre AS cliente
 FROM ordenes o
 JOIN clientes c ON c.id = o.cliente_id
@@ -619,6 +620,12 @@ WHERE o.id=$1
 
     if (ord.rows.length === 0) {
       throw new Error("Orden no encontrada");
+    }
+
+    // ⚠️ Verificar que no esté ya retirada (evita doble procesamiento)
+    if (ord.rows[0].estado === 'retirada' || ord.rows[0].estado === 'entregada') {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Esta orden ya fue retirada anteriormente" });
     }
 
     const orden = ord.rows[0];
