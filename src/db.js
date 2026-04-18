@@ -18,4 +18,33 @@ pool.query(`
   )
 `).catch(err => console.error('❌ Error creando push_tokens:', err));
 
+// Crear tabla clientes_contactados si no existe
+pool.query(`
+  CREATE TABLE IF NOT EXISTS clientes_contactados (
+    cliente_id INTEGER PRIMARY KEY,
+    ultimo_contacto TIMESTAMP DEFAULT NOW()
+  )
+`).catch(err => console.error('❌ Error creando clientes_contactados:', err));
+
+// Crear tabla recordatorios_retiro si no existe
+pool.query(`
+  CREATE TABLE IF NOT EXISTS recordatorios_retiro (
+    orden_id INTEGER PRIMARY KEY,
+    ultimo_recordatorio TIMESTAMP DEFAULT NOW()
+  )
+`).catch(err => console.error('❌ Error creando recordatorios_retiro:', err));
+
+// Crear tabla contabilidad si no existe
+pool.query(`
+  CREATE TABLE IF NOT EXISTS contabilidad (
+    id SERIAL PRIMARY KEY,
+    tipo VARCHAR(20) NOT NULL,
+    categoria VARCHAR(50) NOT NULL,
+    descripcion TEXT,
+    monto NUMERIC NOT NULL,
+    fecha DATE NOT NULL DEFAULT CURRENT_DATE,
+    creado_en TIMESTAMP DEFAULT NOW()
+  )
+`).catch(err => console.error('❌ Error creando contabilidad:', err));
+
 module.exports = pool;
