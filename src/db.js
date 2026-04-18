@@ -47,4 +47,19 @@ pool.query(`
   )
 `).catch(err => console.error('❌ Error creando contabilidad:', err));
 
+// Crear tabla club_valets si no existe
+pool.query(`
+  CREATE TABLE IF NOT EXISTS club_valets (
+    id SERIAL PRIMARY KEY,
+    fecha DATE NOT NULL,
+    cantidad INTEGER NOT NULL,
+    precio_unitario NUMERIC NOT NULL DEFAULT 8000,
+    observacion TEXT,
+    facturado BOOLEAN DEFAULT false,
+    numero_factura VARCHAR(50),
+    fecha_factura DATE,
+    creado_en TIMESTAMP DEFAULT NOW()
+  )
+`).catch(err => console.error('❌ Error creando club_valets:', err));
+
 module.exports = pool;
