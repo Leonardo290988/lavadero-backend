@@ -81,6 +81,7 @@ const getBalanceMensual = async (req, res) => {
       SELECT
         COALESCE(SUM(ingresos_efectivo), 0) AS efectivo,
         COALESCE(SUM(ingresos_digital), 0) AS digital,
+        COALESCE(SUM(gastos), 0) AS gastos,
         COALESCE(SUM(total_ventas), 0) AS total
       FROM resumenes
       WHERE tipo = 'diario'
@@ -114,7 +115,7 @@ const getBalanceMensual = async (req, res) => {
       ORDER BY categoria
     `, [mes, anio]);
 
-    const totalCaja = Number(cajaMes.rows[0]?.total || 0);
+    const totalCaja = Number(cajaMes.rows[0]?.total || 0) - Number(cajaMes.rows[0]?.gastos || 0);
     const totalIngresosExternos = ingresosExternos.rows.reduce((acc, r) => acc + Number(r.total), 0);
     const totalEgresos = egresos.rows.reduce((acc, r) => acc + Number(r.total), 0);
     const totalIngresos = totalCaja + totalIngresosExternos;
