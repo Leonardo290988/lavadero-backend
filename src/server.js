@@ -185,6 +185,8 @@ app.use("/auth", require("./routes/auth"));
 app.use("/notificaciones", require("./routes/notificaciones"));
 app.use("/puntos", require("./routes/puntos"));
 app.use("/estadisticas", require("./routes/estadisticas"));
+app.use("/contabilidad", require("./routes/contabilidad"));
+app.use("/contabilidad", require("./routes/contabilidad"));
 
 // ========================
 // SERVER
