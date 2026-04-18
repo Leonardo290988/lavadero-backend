@@ -7,14 +7,17 @@ const {
   crearEnvioDesdeOrden,
   entregarEnvio,
   getEnviosEntregados,
-  getEnviosPendientes
+  getEnviosPendientes,
+  envioFallido
 } = require("../controllers/enviosController");
+
 router.get("/activo", getEnvioActivo);
 router.post("/prepago", crearEnvioPrePago);
 router.get("/pendientes", getEnviosPendientes);
 router.post("/desde-orden", crearEnvioDesdeOrden);
 
 router.put("/:id/entregar", entregarEnvio);
+router.put("/:id/fallido", envioFallido);
 router.get("/entregados", getEnviosEntregados);
 
 module.exports = router;

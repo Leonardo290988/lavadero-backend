@@ -181,8 +181,8 @@ await client.query(`
     if (restante > 0) {
       await client.query(`
         INSERT INTO caja_movimientos
-        (caja_id,tipo,descripcion,monto,forma_pago)
-        VALUES ($1,'ingreso',$2,$3,$4)
+        (caja_id,tipo,descripcion,monto,forma_pago,creado_en)
+        VALUES ($1,'ingreso',$2,$3,$4,(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'))
       `, [
         caja_id,
         `Cobro envío orden #${envio.orden_id}`,
@@ -324,5 +324,71 @@ module.exports = {
   getEnviosEntregados,
   marcarEnvioEntregado,
   crearEnvioPrePago,
-  getEnviosPendientes
+  getEnviosPendientes,
+  envioFallido
 };
+
+// ======================================
+// ENVÍO FALLIDO — pasar orden a lista para retirar
+// ======================================
+async function envioFallido(req, res) {
+  const { id } = req.params; // id del envío
+  try {
+    // Obtener el envío y su orden
+    const envioRes = await pool.query(
+      `SELECT e.id, e.orden_id, c.nombre, c.telefono
+       FROM envios e
+       JOIN clientes c ON c.id = e.cliente_id
+       WHERE e.id = $1`, [id]
+    );
+
+    if (envioRes.rows.length === 0) {
+      return res.status(404).json({ error: "Envío no encontrado" });
+    }
+
+    const envio = envioRes.rows[0];
+
+    if (!envio.orden_id) {
+      return res.status(400).json({ error: "El envío no tiene orden asociada" });
+    }
+
+    // Marcar envío como fallido (estado cancelado)
+    await pool.query(
+      `UPDATE envios SET estado = 'cancelado' WHERE id = $1`, [id]
+    );
+
+    // Pasar la orden a estado lista sin envío
+    await pool.query(
+      `UPDATE ordenes SET tiene_envio = false WHERE id = $1`, [envio.orden_id]
+    );
+
+    // Generar WhatsApp avisando que debe abonar nuevo envío
+    let whatsapp_url = null;
+    if (envio.telefono) {
+      const telefono = envio.telefono.replace(/\D/g, "");
+      const mensaje = `🧺 *Lavaderos Moreno*
+
+Hola ${envio.nombre}! 👋
+Intentamos entregar tu orden pero no encontramos a nadie en el domicilio 😕
+
+Tu ropa quedó guardada en el local lista para retirar.
+
+Si querés que te lo enviemos nuevamente, podés coordinarlo desde nuestra app:
+📱 Abrí *Lavaderos Moreno* → *Mis órdenes* → seleccioná tu orden → tocá *Solicitar envío a domicilio* → abonás el envío y listo ✅
+
+También podés pasarte a retirarla personalmente:
+📍 Hipólito Yrigoyen 1471, Moreno
+🕐 Lunes a Sábados de 9 a 18hs
+
+Cualquier consulta escribinos por acá 😊`.trim();
+
+      whatsapp_url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
+    }
+
+    res.json({ ok: true, whatsapp_url });
+
+  } catch (error) {
+    console.error("ERROR envioFallido:", error);
+    res.status(500).json({ error: "Error procesando envío fallido" });
+  }
+}

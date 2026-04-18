@@ -445,21 +445,48 @@ const cerrarOrden = async (req, res) => {
     if (clienteResult.rows.length > 0 && clienteResult.rows[0].telefono) {
       const cliente = clienteResult.rows[0];
       const telefono = cliente.telefono.replace(/\D/g, "");
+      const saldoAPagar = Math.max(Number(total) - Number(ordenResult.rows[0].senia || 0), 0);
+      const tieneEnvio = ordenResult.rows[0].tiene_envio;
 
-      const saldoAPagar = Number(total) - Number(ordenResult.rows[0].senia || 0);
-      const mensaje = `🧺 *Lavaderos Moreno*
+      let mensaje;
+
+      if (tieneEnvio) {
+        // Hora actual en Argentina (UTC-3)
+        const horaArgentina = new Date().toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "numeric", hour12: false });
+        const horaActual = parseInt(horaArgentina);
+        const esHoy = horaActual < 16;
+
+        const diaEnvio = esHoy ? "hoy" : "mañana";
+
+        mensaje = `🧺 *Lavaderos Moreno*
+
+Hola ${cliente.nombre}! 👋
+Tu orden *#${id}* está lista ✨
+
+🚚 Te estaremos enviando tu ropa *${diaEnvio}* entre las *16 y 18hs*.
+
+💵 Saldo a abonar al recibir: *$${saldoAPagar}*
+
+📌 *Importante:*
+Si no podés recibir el envío en ese horario, avisanos con anticipación para reprogramarlo.
+En caso de no encontrar a nadie en el domicilio al momento de la entrega, el costo del envío deberá abonarse nuevamente para coordinar un nuevo intento.
+
+Cualquier consulta escribinos por acá 😊`.trim();
+      } else {
+        mensaje = `🧺 *Lavaderos Moreno*
 
 Hola ${cliente.nombre}! 👋
 Tu orden *#${id}* está lista y esperándote ✨
 
-💵 Saldo a abonar al retirar: *$${Math.max(saldoAPagar, 0)}*
+💵 Saldo a abonar al retirar: *$${saldoAPagar}*
 
 📍 Hipólito Yrigoyen 1471, Moreno
 🕐 Lunes a Sábados de 9 a 18hs
 
 ⚠️ Recordá que pasados los 30 días se cobra una multa por almacenamiento.`.trim();
+      }
 
-            whatsapp_url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
+      whatsapp_url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
     }
 
     // ===============================
