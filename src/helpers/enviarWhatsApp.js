@@ -1,24 +1,25 @@
-const enviarWhatsApp = async ({ telefono, nombre, ordenId, total, senia }) => {
-  const saldo = Math.max(total - senia, 0);
+const axios = require("axios");
 
-  const mensaje = `🧺 *Lavaderos Moreno*
+const BOT_URL = process.env.BOT_URL || "https://lavadero-bot-production.up.railway.app";
 
-Hola ${nombre}! 👋
-Tu orden *#${ordenId}* está lista y esperándote ✨
+const enviarWhatsApp = async ({ telefono, mensaje }) => {
+  try {
+    const res = await axios.post(`${BOT_URL}/enviar`, { telefono, mensaje }, { timeout: 10000 });
+    if (res.data.ok) {
+      console.log(`✅ WhatsApp enviado via bot a ${telefono}`);
+      return { ok: true, automatico: true };
+    }
+  } catch (error) {
+    console.warn("⚠️ Bot no disponible, usando URL manual:", error.message);
+  }
 
-💵 Saldo a abonar al retirar: *$${saldo}*
-
-📍 Hipólito Yrigoyen 1471, Moreno
-🕐 Lunes a Sábados de 9 a 18hs
-
-⚠️ Recordá que pasados los 30 días se cobra una multa por almacenamiento.`;
-
-  // 👉 POR AHORA SOLO LOGUEAMOS
-  console.log('📲 WhatsApp a enviar:');
-  console.log('Tel:', telefono);
-  console.log(mensaje);
-
-  return true;
+  // Fallback: devolver URL para abrir WhatsApp manualmente
+  const tel = telefono.replace(/\D/g, "");
+  return {
+    ok: false,
+    automatico: false,
+    whatsapp_url: `https://wa.me/${tel}?text=${encodeURIComponent(mensaje)}`
+  };
 };
 
 module.exports = enviarWhatsApp;

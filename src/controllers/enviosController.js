@@ -1,5 +1,6 @@
 const pool = require("../db");
 const obtenerZonaCliente = require("../helpers/zonaCliente");
+const enviarWhatsApp = require("../helpers/enviarWhatsApp");
 
 // ===============================
 // CREAR ENVIO PREPAGO
@@ -382,7 +383,10 @@ También podés pasarte a retirarla personalmente:
 
 Cualquier consulta escribinos por acá 😊`.trim();
 
-      whatsapp_url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
+      const result = await enviarWhatsApp({ telefono, mensaje });
+      if (!result.automatico) {
+        whatsapp_url = result.whatsapp_url;
+      }
     }
 
     res.json({ ok: true, whatsapp_url });

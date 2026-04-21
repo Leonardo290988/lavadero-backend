@@ -487,6 +487,13 @@ Tu orden *#${id}* está lista y esperándote ✨
       }
 
       whatsapp_url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
+
+      // Intentar enviar automáticamente via bot
+      const resultBot = await enviarWhatsApp({ telefono, mensaje });
+      if (resultBot.automatico) {
+        whatsapp_url = null; // No mostrar URL si el bot lo envió
+        console.log("✅ Mensaje de orden lista enviado automáticamente");
+      }
     }
 
     // ===============================
