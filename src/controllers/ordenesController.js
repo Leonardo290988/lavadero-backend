@@ -14,9 +14,10 @@ const getOrdenes = async (req, res) => {
         o.cliente_id,
         c.nombre AS cliente,
         o.estado,
-       o.fecha_ingreso,
-       o.fecha_retiro,
-        o.senia
+        o.fecha_ingreso,
+        o.fecha_retiro,
+        o.senia,
+        o.total
       FROM ordenes o
       JOIN clientes c ON c.id = o.cliente_id
       ORDER BY o.id DESC
