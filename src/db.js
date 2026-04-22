@@ -62,4 +62,15 @@ pool.query(`
   )
 `).catch(err => console.error('❌ Error creando club_valets:', err));
 
+// Crear tabla historial_precios si no existe
+pool.query(`
+  CREATE TABLE IF NOT EXISTS historial_precios (
+    id SERIAL PRIMARY KEY,
+    servicio_id INTEGER NOT NULL,
+    precio_anterior NUMERIC NOT NULL,
+    precio_nuevo NUMERIC NOT NULL,
+    fecha TIMESTAMP DEFAULT NOW()
+  )
+`).catch(err => console.error('❌ Error creando historial_precios:', err));
+
 module.exports = pool;

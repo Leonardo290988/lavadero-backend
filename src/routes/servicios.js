@@ -6,10 +6,14 @@ const {
   getServicios,
   createServicio,
   actualizarServicio,
-  toggleServicio
+  toggleServicio,
+  getHistorialPrecios,
+  getAnalisisPrecios
 } = require('../controllers/serviciosController');
 
 router.get('/publicos', getServiciosPublicos);
+router.get('/historial-precios', getHistorialPrecios);
+router.get('/analisis-precios', getAnalisisPrecios);
 router.get('/', getServicios);
 router.post('/', createServicio);
 router.put('/:id', actualizarServicio);
