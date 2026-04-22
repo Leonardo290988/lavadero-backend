@@ -1,11 +1,21 @@
 const pool = require('../db');
 
+const ORDEN_SERVICIOS = `
+  CASE
+    WHEN nombre LIKE 'Lavado Acolchado%' THEN 1
+    WHEN nombre = 'Zapatillas' THEN 2
+    WHEN nombre LIKE 'Acolchado%' THEN 3
+    WHEN nombre = 'Servicio Valet' THEN 4
+    WHEN nombre = 'Servicio Valet 1/2' THEN 5
+    WHEN nombre = 'Camperon' THEN 6
+    ELSE 7
+  END, precio ASC
+`;
+
 // GET /servicios
 const getServicios = async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM servicios ORDER BY nombre ASC'
-    );
+    const result = await pool.query(`SELECT * FROM servicios ORDER BY ${ORDEN_SERVICIOS}`);
     res.json(result.rows);
   } catch (error) {
     console.error('GET SERVICIOS ERROR:', error);
@@ -20,7 +30,7 @@ const getServiciosPublicos = async (req, res) => {
       SELECT id, nombre, precio
       FROM servicios
       WHERE activo = true OR activo IS NULL
-      ORDER BY nombre ASC
+      ORDER BY ${ORDEN_SERVICIOS}
     `);
     res.json(result.rows);
   } catch (error) {
@@ -32,11 +42,9 @@ const getServiciosPublicos = async (req, res) => {
 // POST /servicios
 const createServicio = async (req, res) => {
   const { nombre, precio } = req.body;
-
   if (!nombre || precio == null) {
     return res.status(400).json({ error: 'Nombre y precio son obligatorios' });
   }
-
   try {
     const result = await pool.query(
       `INSERT INTO servicios (nombre, precio, activo) VALUES ($1, $2, true) RETURNING *`,
@@ -53,16 +61,12 @@ const createServicio = async (req, res) => {
 const actualizarServicio = async (req, res) => {
   const { id } = req.params;
   const { nombre, precio } = req.body;
-
   if (!nombre || precio == null) {
     return res.status(400).json({ error: 'Nombre y precio son obligatorios' });
   }
-
   try {
-    // Obtener precio anterior
     const anterior = await pool.query(`SELECT precio FROM servicios WHERE id = $1`, [id]);
     const precioAnterior = anterior.rows[0]?.precio;
-
     const result = await pool.query(
       `UPDATE servicios SET nombre = $1, precio = $2 WHERE id = $3 RETURNING *`,
       [nombre, precio, id]
@@ -70,15 +74,12 @@ const actualizarServicio = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Servicio no encontrado' });
     }
-
-    // Guardar historial si el precio cambió
     if (precioAnterior && Number(precioAnterior) !== Number(precio)) {
       await pool.query(`
         INSERT INTO historial_precios (servicio_id, precio_anterior, precio_nuevo)
         VALUES ($1, $2, $3)
       `, [id, precioAnterior, precio]);
     }
-
     res.json(result.rows[0]);
   } catch (error) {
     console.error('UPDATE SERVICIO ERROR:', error);
@@ -145,9 +146,7 @@ const getAnalisisPrecios = async (req, res) => {
         AND EXTRACT(YEAR FROM fecha_desde) = $2
     `, [mes, anio]);
 
-    const ultimoAumento = await pool.query(`
-      SELECT MAX(fecha) AS fecha FROM historial_precios
-    `);
+    const ultimoAumento = await pool.query(`SELECT MAX(fecha) AS fecha FROM historial_precios`);
 
     const totalGastosExt = gastos.rows.reduce((acc, g) => acc + Number(g.total), 0);
     const totalIngresos = Number(ingresos.rows[0]?.total || 0);
@@ -192,4 +191,3 @@ module.exports = {
   getHistorialPrecios,
   getAnalisisPrecios
 };
-
