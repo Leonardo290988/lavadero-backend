@@ -101,16 +101,6 @@ const toggleServicio = async (req, res) => {
   }
 };
 
-module.exports = {
-  getServiciosPublicos,
-  getServicios,
-  createServicio,
-  actualizarServicio,
-  toggleServicio,
-  getHistorialPrecios,
-  getAnalisisPrecios
-};
-
 // GET /servicios/historial-precios
 const getHistorialPrecios = async (req, res) => {
   try {
@@ -137,7 +127,6 @@ const getAnalisisPrecios = async (req, res) => {
     const mes = hoy.getMonth() + 1;
     const anio = hoy.getFullYear();
 
-    // Gastos del mes (insumos + alquiler + sueldos)
     const gastos = await pool.query(`
       SELECT categoria, COALESCE(SUM(monto), 0) AS total
       FROM contabilidad
@@ -147,7 +136,6 @@ const getAnalisisPrecios = async (req, res) => {
       GROUP BY categoria
     `, [mes, anio]);
 
-    // Ingresos del mes (caja)
     const ingresos = await pool.query(`
       SELECT COALESCE(SUM(total_ventas), 0) AS total,
              COALESCE(SUM(gastos), 0) AS gastos_caja
@@ -157,7 +145,6 @@ const getAnalisisPrecios = async (req, res) => {
         AND EXTRACT(YEAR FROM fecha_desde) = $2
     `, [mes, anio]);
 
-    // Último aumento de precios
     const ultimoAumento = await pool.query(`
       SELECT MAX(fecha) AS fecha FROM historial_precios
     `);
@@ -168,7 +155,6 @@ const getAnalisisPrecios = async (req, res) => {
     const totalGastos = totalGastosExt + gastosCaja;
     const margen = totalIngresos > 0 ? ((totalIngresos - totalGastos) / totalIngresos * 100) : 0;
 
-    // Sugerir aumento si margen < 30% o si no se actualizaron precios en más de 60 días
     const diasDesdeAumento = ultimoAumento.rows[0]?.fecha
       ? Math.floor((new Date() - new Date(ultimoAumento.rows[0].fecha)) / (1000 * 60 * 60 * 24))
       : 999;
@@ -195,5 +181,16 @@ const getAnalisisPrecios = async (req, res) => {
     console.error('ERROR analisis precios:', error);
     res.status(500).json({ error: 'Error en análisis' });
   }
+};
+
+module.exports = {
+  getServiciosPublicos,
+  getServicios,
+  createServicio,
+  actualizarServicio,
+  toggleServicio,
+  getHistorialPrecios,
+  getAnalisisPrecios
+};
 };
 
