@@ -192,5 +192,4 @@ module.exports = {
   getHistorialPrecios,
   getAnalisisPrecios
 };
-};
 
