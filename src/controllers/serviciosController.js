@@ -2,13 +2,14 @@ const pool = require('../db');
 
 const ORDEN_SERVICIOS = `
   CASE
-    WHEN nombre LIKE 'Lavado Acolchado%' THEN 1
-    WHEN nombre = 'Zapatillas' THEN 2
-    WHEN nombre LIKE 'Acolchado%' THEN 3
-    WHEN nombre = 'Servicio Valet' THEN 4
-    WHEN nombre = 'Servicio Valet 1/2' THEN 5
-    WHEN nombre = 'Camperon' THEN 6
-    ELSE 7
+    WHEN nombre = 'Servicio Valet' THEN 1
+    WHEN nombre = 'Servicio Valet 1/2' THEN 2
+    WHEN nombre = 'Camperon' THEN 3
+    WHEN nombre LIKE 'Acolchado%' THEN 4
+    WHEN nombre LIKE 'Lavado Acolchado%' THEN 5
+    WHEN nombre = 'Lavado solo Ropa' THEN 6
+    WHEN nombre = 'Zapatillas' THEN 7
+    ELSE 8
   END, precio ASC
 `;
 
