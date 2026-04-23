@@ -1,7 +1,12 @@
 const { Pool } = require('pg');
 
+if (!process.env.DATABASE_URL) {
+  console.error('❌ Falta la variable de entorno DATABASE_URL');
+  process.exit(1);
+}
+
 const pool = new Pool({
-  connectionString: "postgresql://postgres:yeSmDUOoFbjOftXEDRZNQwtDJIunOMxT@postgres.railway.internal:5432/railway",
+  connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
