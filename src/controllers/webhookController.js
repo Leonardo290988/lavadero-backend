@@ -103,16 +103,44 @@ const webhookMercadoPago = async (req, res) => {
 
       console.log("🚚 Envío habilitado:", envio_id);
 
-      // 2️⃣ Marcar orden como tiene_envio = true
-      await pool.query(`
-        UPDATE ordenes
-        SET tiene_envio = true
-        WHERE id = (
-          SELECT orden_id FROM envios WHERE id = $1
-        )
+      // 2️⃣ Obtener el envío para ver si tiene orden_id
+      const envioRes = await pool.query(`
+        SELECT orden_id, cliente_id FROM envios WHERE id = $1
       `, [envio_id]);
 
-      console.log("📦 Orden actualizada con envío");
+      let orden_id_final = envioRes.rows[0]?.orden_id;
+
+      // 3️⃣ Si no tiene orden_id, buscar la orden lista del cliente
+      if (!orden_id_final) {
+        const ordenRes = await pool.query(`
+          SELECT id FROM ordenes
+          WHERE cliente_id = $1
+            AND estado = 'lista'
+            AND (tiene_envio = false OR tiene_envio IS NULL)
+          ORDER BY id DESC
+          LIMIT 1
+        `, [envioRes.rows[0]?.cliente_id]);
+
+        if (ordenRes.rows.length > 0) {
+          orden_id_final = ordenRes.rows[0].id;
+
+          // Vincular el envío con la orden
+          await pool.query(`
+            UPDATE envios SET orden_id = $1 WHERE id = $2
+          `, [orden_id_final, envio_id]);
+
+          console.log("🔗 Envío vinculado a orden:", orden_id_final);
+        }
+      }
+
+      // 4️⃣ Marcar orden como tiene_envio = true
+      if (orden_id_final) {
+        await pool.query(`
+          UPDATE ordenes SET tiene_envio = true WHERE id = $1
+        `, [orden_id_final]);
+
+        console.log("📦 Orden actualizada con envío:", orden_id_final);
+      }
     }
 
     // ===========================
