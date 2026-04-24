@@ -4,6 +4,7 @@ const generarTicketRetiro = require("../utils/generarTicketRetiro");
 const generarTicketProvisorio = require("../utils/generarTicketProvisorio");
 const obtenerZonaCliente = require("../helpers/zonaCliente");
 const enviarPushNotification = require("../helpers/enviarPushNotification");
+const enviarWhatsApp = require("../helpers/enviarWhatsApp");
 
 
 
@@ -160,6 +161,36 @@ const aceptarRetiro = async (req, res) => {
       pdf: `/pdf/provisorios/${nombreArchivo}`
     });
 
+    // 4️⃣ Enviar WhatsApp al cliente
+    if (retiro.telefono) {
+      const horaArgentina = new Date().toLocaleString("es-AR", {
+        timeZone: "America/Argentina/Buenos_Aires",
+        hour: "numeric", hour12: false
+      });
+      const horaActual = parseInt(horaArgentina);
+      const esHoy = horaActual < 15;
+      const diaRetiro = esHoy ? "hoy" : "mañana";
+
+      const mensaje = `🧺 *Lavaderos Moreno*
+
+Hola ${retiro.nombre}! 👋
+Tu solicitud de retiro fue *aceptada* ✅
+
+🚚 Pasaremos a retirar tu ropa *${diaRetiro}* entre las *16 y 18hs*.
+📍 ${retiro.direccion}
+
+📌 *Importante:* Si no podés estar en ese horario, avisanos con anticipación.
+En caso de no encontrar a nadie en el domicilio al momento del retiro, perderás el retiro y deberás volver a solicitarlo y abonarlo.
+
+Cualquier consulta escribinos 😊`.trim();
+
+      try {
+        await enviarWhatsApp({ telefono: retiro.telefono, mensaje });
+      } catch (e) {
+        console.error("Error enviando WhatsApp retiro aceptado:", e.message);
+      }
+    }
+
   } catch (error) {
     await client.query("ROLLBACK");
     console.error(error);
@@ -230,7 +261,6 @@ const marcarEnCamino = async (req,res)=>{
   const { id } = req.params;
 
   try {
-
     const r = await pool.query(`
       UPDATE retiros
       SET estado='en_camino'
@@ -242,9 +272,36 @@ const marcarEnCamino = async (req,res)=>{
       return res.status(404).json({error:"Retiro no encontrado"});
     }
 
-    res.json({ok:true,
-             estado: "en_camino"
-    });
+    const retiro = r.rows[0];
+
+    res.json({ ok: true, estado: "en_camino" });
+
+    // Enviar WhatsApp
+    const clienteRes = await pool.query(
+      `SELECT nombre, telefono FROM clientes WHERE id = $1`,
+      [retiro.cliente_id]
+    );
+
+    if (clienteRes.rows.length > 0 && clienteRes.rows[0].telefono) {
+      const { nombre, telefono } = clienteRes.rows[0];
+
+      const mensaje = `🧺 *Lavaderos Moreno*
+
+Hola ${nombre}! 👋
+Ya estamos *en camino* a retirar tu ropa 🚚
+
+📍 ${retiro.direccion}
+
+📌 *Importante:* En caso de no encontrar a nadie en el domicilio al momento del retiro, perderás el retiro y deberás volver a solicitarlo y abonarlo.
+
+Cualquier consulta escribinos 😊`.trim();
+
+      try {
+        await enviarWhatsApp({ telefono, mensaje });
+      } catch (e) {
+        console.error("Error enviando WhatsApp en camino:", e.message);
+      }
+    }
 
   } catch(error){
     console.error(error);
