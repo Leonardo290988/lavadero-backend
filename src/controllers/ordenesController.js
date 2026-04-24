@@ -5,6 +5,55 @@ const imprimirTicket = require("../utils/imprimirTicket");
 const generarTicketRopa = require("../utils/generarTicketRopa");
 const generarTicketRetiro = require("../utils/generarTicketRetiro");
 const { exec } = require("child_process");
+
+// ======================================
+// HELPER: Verificar si la promo 3x2 aplica hoy (Martes a Viernes)
+// ======================================
+const promoActivaHoy = () => {
+  const dia = new Date().toLocaleString("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    weekday: "long"
+  }).toLowerCase();
+  return ["martes", "miércoles", "jueves", "viernes"].includes(dia);
+};
+
+// ======================================
+// HELPER: Calcular descuento 3x2 para acolchados y camperones (Martes a Viernes)
+// ======================================
+const calcularPromo3x2 = (items) => {
+  if (!promoActivaHoy()) return 0;
+
+  const acolchados = [];
+  const camperones = [];
+
+  for (const s of items) {
+    const nombre = (s.descripcion || s.nombre || "").toLowerCase();
+    const precio = Number(s.precio || s.precio_unitario || 0);
+    const cantidad = Number(s.cantidad || 1);
+
+    if (nombre.includes('acolchado') || nombre.includes('frazada')) {
+      for (let i = 0; i < cantidad; i++) acolchados.push(precio);
+    } else if (nombre.includes('camperon') || nombre.includes('camperón')) {
+      for (let i = 0; i < cantidad; i++) camperones.push(precio);
+    }
+  }
+
+  let descuento = 0;
+
+  // 3x2 acolchados: cada 3ro es gratis (el más barato del grupo)
+  acolchados.sort((a, b) => b - a);
+  acolchados.forEach((precio, index) => {
+    if ((index + 1) % 3 === 0) descuento += precio;
+  });
+
+  // 3x2 camperones: cada 3ro es gratis (el más barato del grupo)
+  camperones.sort((a, b) => b - a);
+  camperones.forEach((precio, index) => {
+    if ((index + 1) % 3 === 0) descuento += precio;
+  });
+
+  return descuento;
+};
 // GET /ordenes
 const getOrdenes = async (req, res) => {
   try {
@@ -139,22 +188,14 @@ const recalcularTotalOrden = async (ordenId) => {
   `, [ordenId]);
 
   let subtotal = 0;
-  let acolchados = [];
 
   for (const s of itemsRes.rows) {
-    if (s.descripcion.toLowerCase().includes('acolchado')) {
-      for (let i = 0; i < s.cantidad; i++) acolchados.push(Number(s.precio));
-      subtotal += Number(s.precio) * Number(s.cantidad);
-    } else {
-      subtotal += Number(s.precio) * Number(s.cantidad);
-    }
+    subtotal += Number(s.precio) * Number(s.cantidad);
   }
 
-  acolchados.sort((a, b) => b - a);
-  let promoDescuento = 0;
-  acolchados.forEach((precio, index) => {
-    if ((index + 1) % 3 === 0) promoDescuento += precio;
-  });
+  const promoDescuento = calcularPromo3x2(
+    itemsRes.rows.map(s => ({ descripcion: s.descripcion, precio: s.precio, cantidad: s.cantidad }))
+  );
 
   let total = subtotal - promoDescuento - Number(senia || 0);
   if (total < 0) total = 0;
@@ -271,25 +312,15 @@ const getOrdenesAbiertas = async (req, res) => {
       `, [o.id]);
 
       let total = 0;
-      let acolchados = [];
 
       for (const s of serviciosResult.rows) {
-        if (s.nombre.toLowerCase().includes('acolchado')) {
-          for (let i = 0; i < s.cantidad; i++) {
-            acolchados.push(Number(s.precio_unitario));
-          }
-        } else {
-          total += Number(s.cantidad) * Number(s.precio_unitario);
-        }
+        total += Number(s.cantidad) * Number(s.precio_unitario);
       }
 
-      // Promo 3x2 acolchados
-      acolchados.sort((a, b) => b - a);
-      acolchados.forEach((precio, index) => {
-        if ((index + 1) % 3 !== 0) {
-          total += precio;
-        }
-      });
+      // Promo 3x2 acolchados y camperones (Martes a Viernes)
+      total -= calcularPromo3x2(
+        serviciosResult.rows.map(s => ({ descripcion: s.nombre, precio: s.precio_unitario, cantidad: s.cantidad }))
+      );
 
       total -= Number(o.senia) || 0;
       if (total < 0) total = 0;
@@ -351,26 +382,15 @@ const cerrarOrden = async (req, res) => {
     `, [id]);
 
     let total = 0;
-    let acolchados = [];
 
     for (const s of serviciosResult.rows) {
-      if (s.nombre.toLowerCase().includes('acolchado')) {
-        for (let i = 0; i < s.cantidad; i++) {
-          acolchados.push(Number(s.precio_unitario));
-        }
-      } else {
-        total += Number(s.cantidad) * Number(s.precio_unitario);
-      }
+      total += Number(s.cantidad) * Number(s.precio_unitario);
     }
 
-    // 2️⃣ Promo 3x2 en acolchados
-    acolchados.sort((a, b) => b - a);
-
-    acolchados.forEach((precio, index) => {
-      if ((index + 1) % 3 !== 0) {
-        total += precio;
-      }
-    });
+    // 2️⃣ Promo 3x2 en acolchados y camperones (Martes a Viernes)
+    total -= calcularPromo3x2(
+      serviciosResult.rows.map(s => ({ descripcion: s.nombre, precio: s.precio_unitario, cantidad: s.cantidad }))
+    );
 
     // 3️⃣ Guardar total REAL con descuento de fidelidad si aplica
     const ordenInfo = await pool.query(`
@@ -743,24 +763,15 @@ WHERE o.id=$1
 const items = itemsRes.rows;
 
 let totalItems = 0;
-let acolchados = [];
 
 for (const i of items) {
-
-  if (i.descripcion.toLowerCase().includes("acolchado")) {
-    for (let x = 0; x < i.cantidad; x++) {
-      acolchados.push(Number(i.precio));
-    }
-  } else {
-    totalItems += Number(i.precio) * Number(i.cantidad);
-  }
+  totalItems += Number(i.precio) * Number(i.cantidad);
 }
 
-// Promo 3x2
-acolchados.sort((a,b)=>b-a);
-acolchados.forEach((p,idx)=>{
-  if ((idx+1)%3 !== 0) totalItems += p;
-});
+// Promo 3x2 acolchados y camperones (Martes a Viernes)
+totalItems -= calcularPromo3x2(
+  items.map(i => ({ descripcion: i.descripcion, precio: i.precio, cantidad: i.cantidad }))
+);
 
 // Descontar seña
 totalItems -= Number(senia || 0);
@@ -1063,32 +1074,15 @@ const confirmarOrden = async (req, res) => {
    
     // Calcular subtotal servicios
 let subtotalReal = 0;
-let acolchados = [];
 
-// Separar acolchados
 for (const s of items) {
-
-  if (s.descripcion.toLowerCase().includes("acolchado")) {
-    for (let i = 0; i < s.cantidad; i++) {
-      acolchados.push(Number(s.precio));
-    }
-    subtotalReal += Number(s.precio) * Number(s.cantidad);
-  } else {
-    const linea = Number(s.precio) * Number(s.cantidad);
-    subtotalReal += linea;
-  }
+  subtotalReal += Number(s.precio) * Number(s.cantidad);
 }
 
-// ===== PROMO 3x2 =====
-acolchados.sort((a, b) => b - a);
-
-let promoDescuento = 0;
-
-acolchados.forEach((precio, index) => {
-  if ((index + 1) % 3 === 0) {
-    promoDescuento += precio;   // gratis
-  }
-});
+// ===== PROMO 3x2 acolchados y camperones (Martes a Viernes) =====
+const promoDescuento = calcularPromo3x2(
+  items.map(s => ({ descripcion: s.descripcion, precio: s.precio, cantidad: s.cantidad }))
+);
 
 let total = subtotalReal - promoDescuento;
 
@@ -1201,24 +1195,16 @@ const getOrdenesCliente = async (req, res) => {
       if (estadosConTotalFinal.includes(orden.estado)) {
         orden.total = Number(orden.total_cerrado);
       } else {
-        // Calcular en vivo con promo 3x2 acolchados
+        // Calcular en vivo con promo 3x2 acolchados y camperones (Martes a Viernes)
         let total = 0;
-        let acolchados = [];
 
         for (const s of detallesRes.rows) {
-          if (s.servicio.toLowerCase().includes('acolchado')) {
-            for (let i = 0; i < s.cantidad; i++) {
-              acolchados.push(Number(s.precio_unitario));
-            }
-          } else {
-            total += Number(s.cantidad) * Number(s.precio_unitario);
-          }
+          total += Number(s.cantidad) * Number(s.precio_unitario);
         }
 
-        acolchados.sort((a, b) => b - a);
-        acolchados.forEach((precio, index) => {
-          if ((index + 1) % 3 !== 0) total += precio;
-        });
+        total -= calcularPromo3x2(
+          detallesRes.rows.map(s => ({ descripcion: s.servicio, precio: s.precio_unitario, cantidad: s.cantidad }))
+        );
 
         total -= Number(orden.senia) || 0;
         if (total < 0) total = 0;
@@ -1275,27 +1261,16 @@ const reimprimirTicketOrden = async (req, res) => {
 
     // Recalcular totales (misma lógica que confirmarOrden)
     let subtotalReal = 0;
-    let acolchados = [];
 
     for (const s of items) {
-      if (s.descripcion.toLowerCase().includes("acolchado")) {
-        for (let x = 0; x < s.cantidad; x++) {
-          acolchados.push(Number(s.precio));
-        }
-      } else {
-        subtotalReal += Number(s.precio) * Number(s.cantidad);
-      }
+      subtotalReal += Number(s.precio) * Number(s.cantidad);
     }
 
-    acolchados.sort((a, b) => b - a);
-    let promoDescuento = 0;
-    acolchados.forEach((precio, index) => {
-      if ((index + 1) % 3 === 0) {
-        promoDescuento += precio;
-      } else {
-        subtotalReal += precio;
-      }
-    });
+    // Promo 3x2 acolchados y camperones (Martes a Viernes)
+    const promoDescuento = calcularPromo3x2(
+      items.map(s => ({ descripcion: s.descripcion, precio: s.precio, cantidad: s.cantidad }))
+    );
+    subtotalReal -= promoDescuento;
 
     const senia = Number(orden.senia || 0);
     const total = Number(orden.total || 0);
@@ -1359,22 +1334,15 @@ const reimprimirTicketRetiro = async (req, res) => {
     const items = itemsRes.rows;
 
     let totalItems = 0;
-    let acolchados = [];
 
     for (const i of items) {
-      if (i.descripcion.toLowerCase().includes("acolchado")) {
-        for (let x = 0; x < i.cantidad; x++) {
-          acolchados.push(Number(i.precio));
-        }
-      } else {
-        totalItems += Number(i.precio) * Number(i.cantidad);
-      }
+      totalItems += Number(i.precio) * Number(i.cantidad);
     }
 
-    acolchados.sort((a, b) => b - a);
-    acolchados.forEach((p, idx) => {
-      if ((idx + 1) % 3 !== 0) totalItems += p;
-    });
+    // Promo 3x2 acolchados y camperones (Martes a Viernes)
+    totalItems -= calcularPromo3x2(
+      items.map(i => ({ descripcion: i.descripcion, precio: i.precio, cantidad: i.cantidad }))
+    );
 
     const senia = Number(orden.senia || 0);
     const subtotal = totalItems + senia;
