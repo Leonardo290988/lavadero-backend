@@ -9,8 +9,11 @@ const { exec } = require("child_process");
 // ======================================
 // HELPER: Verificar si la promo 3x2 aplica hoy (Martes a Viernes)
 // ======================================
-const promoActivaHoy = () => {
-  const dia = new Date().toLocaleString("es-AR", {
+// Evalúa el día de INGRESO de la orden, no el día actual.
+// Así una orden del lunes no recibe promo aunque se le carguen servicios el martes.
+const promoActivaEnFecha = (fechaIngreso) => {
+  const fecha = fechaIngreso ? new Date(fechaIngreso) : new Date();
+  const dia = fecha.toLocaleString("es-AR", {
     timeZone: "America/Argentina/Buenos_Aires",
     weekday: "long"
   }).toLowerCase();
@@ -20,8 +23,8 @@ const promoActivaHoy = () => {
 // ======================================
 // HELPER: Calcular descuento 3x2 para acolchados y camperones (Martes a Viernes)
 // ======================================
-const calcularPromo3x2 = (items) => {
-  if (!promoActivaHoy()) return 0;
+const calcularPromo3x2 = (items, fechaIngreso) => {
+  if (!promoActivaEnFecha(fechaIngreso)) return 0;
 
   const acolchados = [];
   const camperones = [];
@@ -38,21 +41,25 @@ const calcularPromo3x2 = (items) => {
     }
   }
 
-  let descuento = 0;
+  // 3x2: en cada grupo de 3 el más barato es gratis.
+  // Ordenamos de MAYOR a MENOR y tomamos el mínimo de cada grupo de 3.
+  // Ej: [$18000, $18000, $18000, $15000, $15000, $15000]
+  //   grupo 1 → [$18000, $18000, $15000] → gratis $15000
+  //   grupo 2 → [$18000, $15000, $15000] → gratis $15000
+  //   descuento total = $30000  ✅
+  const calcularDescuentoGrupo = (arr) => {
+    arr.sort((a, b) => b - a); // mayor a menor
+    let descuento = 0;
+    for (let i = 0; i < arr.length; i += 3) {
+      const grupo = arr.slice(i, i + 3);
+      if (grupo.length === 3) {
+        descuento += Math.min(...grupo); // el más barato del grupo es gratis
+      }
+    }
+    return descuento;
+  };
 
-  // 3x2 acolchados: cada 3ro es gratis (el más barato del grupo)
-  acolchados.sort((a, b) => b - a);
-  acolchados.forEach((precio, index) => {
-    if ((index + 1) % 3 === 0) descuento += precio;
-  });
-
-  // 3x2 camperones: cada 3ro es gratis (el más barato del grupo)
-  camperones.sort((a, b) => b - a);
-  camperones.forEach((precio, index) => {
-    if ((index + 1) % 3 === 0) descuento += precio;
-  });
-
-  return descuento;
+  return calcularDescuentoGrupo(acolchados) + calcularDescuentoGrupo(camperones);
 };
 // GET /ordenes
 const getOrdenes = async (req, res) => {
@@ -93,6 +100,7 @@ const crearOrden = async (req, res) => {
       estado,
       fecha_retiro,
       senia = 0,
+      forma_pago_senia = 'Efectivo',
       usuario_id,
       descuento_fidelidad = 0
     } = req.body;
@@ -138,12 +146,13 @@ const fechaRetiroFinal = fecha_retiro || null;
       await client.query(`
         INSERT INTO caja_movimientos
         (caja_id, tipo, descripcion, monto, forma_pago, creado_en)
-        VALUES ($1,'ingreso',$2,$3,'Efectivo',(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'))
+        VALUES ($1,'ingreso',$2,$3,$4,(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'))
       `,
         [
           caja_id,
           `Seña orden #${orden.id}`,
-          Number(senia)
+          Number(senia),
+          forma_pago_senia === 'transferencia' ? 'Transferencia/MercadoPago' : 'Efectivo'
         ]
       );
     }
@@ -193,8 +202,12 @@ const recalcularTotalOrden = async (ordenId) => {
     subtotal += Number(s.precio) * Number(s.cantidad);
   }
 
+  const ordenInfo = await pool.query(`SELECT fecha_ingreso FROM ordenes WHERE id = $1`, [ordenId]);
+  const fechaIngresoOrden = ordenInfo.rows[0]?.fecha_ingreso || null;
+
   const promoDescuento = calcularPromo3x2(
-    itemsRes.rows.map(s => ({ descripcion: s.descripcion, precio: s.precio, cantidad: s.cantidad }))
+    itemsRes.rows.map(s => ({ descripcion: s.descripcion, precio: s.precio, cantidad: s.cantidad })),
+    fechaIngresoOrden
   );
 
   let total = subtotal - promoDescuento - Number(senia || 0);
@@ -317,9 +330,10 @@ const getOrdenesAbiertas = async (req, res) => {
         total += Number(s.cantidad) * Number(s.precio_unitario);
       }
 
-      // Promo 3x2 acolchados y camperones (Martes a Viernes)
+      // Promo 3x2 acolchados y camperones (según día de ingreso de la orden)
       total -= calcularPromo3x2(
-        serviciosResult.rows.map(s => ({ descripcion: s.nombre, precio: s.precio_unitario, cantidad: s.cantidad }))
+        serviciosResult.rows.map(s => ({ descripcion: s.nombre, precio: s.precio_unitario, cantidad: s.cantidad })),
+        o.fecha_ingreso
       );
 
       total -= Number(o.senia) || 0;
@@ -387,9 +401,11 @@ const cerrarOrden = async (req, res) => {
       total += Number(s.cantidad) * Number(s.precio_unitario);
     }
 
-    // 2️⃣ Promo 3x2 en acolchados y camperones (Martes a Viernes)
+    // 2️⃣ Promo 3x2 en acolchados y camperones (según día de ingreso de la orden)
+    const ordenFechaRes = await pool.query(`SELECT fecha_ingreso FROM ordenes WHERE id = $1`, [id]);
     total -= calcularPromo3x2(
-      serviciosResult.rows.map(s => ({ descripcion: s.nombre, precio: s.precio_unitario, cantidad: s.cantidad }))
+      serviciosResult.rows.map(s => ({ descripcion: s.nombre, precio: s.precio_unitario, cantidad: s.cantidad })),
+      ordenFechaRes.rows[0]?.fecha_ingreso || null
     );
 
     // 3️⃣ Guardar total REAL con descuento de fidelidad si aplica
@@ -768,9 +784,10 @@ for (const i of items) {
   totalItems += Number(i.precio) * Number(i.cantidad);
 }
 
-// Promo 3x2 acolchados y camperones (Martes a Viernes)
+// Promo 3x2 acolchados y camperones (según día de ingreso de la orden)
 totalItems -= calcularPromo3x2(
-  items.map(i => ({ descripcion: i.descripcion, precio: i.precio, cantidad: i.cantidad }))
+  items.map(i => ({ descripcion: i.descripcion, precio: i.precio, cantidad: i.cantidad })),
+  orden.fecha_ingreso || null
 );
 
 // Descontar seña
@@ -888,7 +905,8 @@ const getResumenTurno = async (req, res) => {
 // PUT /ordenes/:id/senia
 const actualizarSenia = async (req, res) => {
   const { id } = req.params;
-  const { senia } = req.body;
+  const { senia, forma_pago_senia = 'efectivo' } = req.body;
+  const formaPago = forma_pago_senia === 'transferencia' ? 'Transferencia/MercadoPago' : 'Efectivo';
 
   const client = await pool.connect();
 
@@ -925,14 +943,14 @@ const actualizarSenia = async (req, res) => {
 
     const caja_id = cajaResult.rows[0].id;
 
-    // 4) Si existe → actualizar monto
+    // 4) Si existe → actualizar monto y forma_pago
     if (existe.rows.length > 0) {
 
       await client.query(`
         UPDATE caja_movimientos
-        SET monto = $1
-        WHERE descripcion = $2`
-      , [Number(senia), `Seña orden #${id}`]);
+        SET monto = $1, forma_pago = $2
+        WHERE descripcion = $3`
+      , [Number(senia), formaPago, `Seña orden #${id}`]);
 
     } 
     // 5) Si no existe y senia > 0 → insertar
@@ -941,11 +959,12 @@ const actualizarSenia = async (req, res) => {
       await client.query(`
         INSERT INTO caja_movimientos
         (caja_id, tipo, descripcion, monto, forma_pago, creado_en)
-        VALUES ($1,'ingreso',$2,$3,'Efectivo',(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'))
+        VALUES ($1,'ingreso',$2,$3,$4,(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'))
       `, [
         caja_id,
         `Seña orden #${id}`,
-        Number(senia)
+        Number(senia),
+        formaPago
       ]);
     }
 
@@ -1079,9 +1098,10 @@ for (const s of items) {
   subtotalReal += Number(s.precio) * Number(s.cantidad);
 }
 
-// ===== PROMO 3x2 acolchados y camperones (Martes a Viernes) =====
+// ===== PROMO 3x2 acolchados y camperones (según día de ingreso de la orden) =====
 const promoDescuento = calcularPromo3x2(
-  items.map(s => ({ descripcion: s.descripcion, precio: s.precio, cantidad: s.cantidad }))
+  items.map(s => ({ descripcion: s.descripcion, precio: s.precio, cantidad: s.cantidad })),
+  orden.fecha_ingreso || null
 );
 
 let total = subtotalReal - promoDescuento;
@@ -1203,7 +1223,8 @@ const getOrdenesCliente = async (req, res) => {
         }
 
         total -= calcularPromo3x2(
-          detallesRes.rows.map(s => ({ descripcion: s.servicio, precio: s.precio_unitario, cantidad: s.cantidad }))
+          detallesRes.rows.map(s => ({ descripcion: s.servicio, precio: s.precio_unitario, cantidad: s.cantidad })),
+          orden.fecha_ingreso || null
         );
 
         total -= Number(orden.senia) || 0;
@@ -1266,9 +1287,10 @@ const reimprimirTicketOrden = async (req, res) => {
       subtotalReal += Number(s.precio) * Number(s.cantidad);
     }
 
-    // Promo 3x2 acolchados y camperones (Martes a Viernes)
+    // Promo 3x2 acolchados y camperones (según día de ingreso de la orden)
     const promoDescuento = calcularPromo3x2(
-      items.map(s => ({ descripcion: s.descripcion, precio: s.precio, cantidad: s.cantidad }))
+      items.map(s => ({ descripcion: s.descripcion, precio: s.precio, cantidad: s.cantidad })),
+      orden.fecha_ingreso || null
     );
     subtotalReal -= promoDescuento;
 
@@ -1339,9 +1361,10 @@ const reimprimirTicketRetiro = async (req, res) => {
       totalItems += Number(i.precio) * Number(i.cantidad);
     }
 
-    // Promo 3x2 acolchados y camperones (Martes a Viernes)
+    // Promo 3x2 acolchados y camperones (según día de ingreso de la orden)
     totalItems -= calcularPromo3x2(
-      items.map(i => ({ descripcion: i.descripcion, precio: i.precio, cantidad: i.cantidad }))
+      items.map(i => ({ descripcion: i.descripcion, precio: i.precio, cantidad: i.cantidad })),
+      orden.fecha_ingreso || null
     );
 
     const senia = Number(orden.senia || 0);
