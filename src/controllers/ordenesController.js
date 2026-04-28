@@ -943,7 +943,9 @@ const actualizarSenia = async (req, res) => {
     `);
 
     if (cajaResult.rows.length === 0) {
-      throw new Error("Debe abrir caja antes de registrar seña");
+      await client.query("ROLLBACK");
+      client.release();
+      return res.status(400).json({ error: "Debe abrir caja para ingresar una seña" });
     }
 
     const caja_id = cajaResult.rows[0].id;
