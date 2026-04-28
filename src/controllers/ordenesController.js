@@ -41,19 +41,24 @@ const calcularPromo3x2 = (items, fechaIngreso) => {
     }
   }
 
-  // 3x2: en cada grupo de 3 el más barato es gratis.
-  // Ordenamos de MAYOR a MENOR y tomamos el mínimo de cada grupo de 3.
+  // 3x2: pagás 2, el más barato de cada trio es gratis.
+  // Algoritmo greedy con dos punteros para maximizar el beneficio del cliente:
+  // Ordenar DESC y usar left/right para armar trios óptimos.
   // Ej: [$18000, $18000, $18000, $15000, $15000, $15000]
-  //   grupo 1 → [$18000, $18000, $15000] → gratis $15000
-  //   grupo 2 → [$18000, $15000, $15000] → gratis $15000
+  //   trio 1 → [$18000, $18000, $15000] → gratis $15000
+  //   trio 2 → [$18000, $15000, $15000] → gratis $15000
   //   descuento total = $30000  ✅
   const calcularDescuentoGrupo = (arr) => {
-    arr.sort((a, b) => b - a); // mayor a menor
-    let descuento = 0;
-    for (let i = 0; i < arr.length; i += 3) {
-      const grupo = arr.slice(i, i + 3);
-      if (grupo.length === 3) {
-        descuento += Math.min(...grupo); // el más barato del grupo es gratis
+    arr.sort((a, b) => b - a);
+    let descuento = 0, left = 0, right = arr.length - 1, count = 0;
+    while (left < right) {
+      count++;
+      if (count === 2) { // cada 2 pagados, el más barato disponible es gratis
+        descuento += arr[right];
+        right--;
+        count = 0;
+      } else {
+        left++;
       }
     }
     return descuento;
