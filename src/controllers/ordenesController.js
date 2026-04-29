@@ -1263,7 +1263,7 @@ const reimprimirTicketOrden = async (req, res) => {
   try {
     // Traer datos de la orden
     const ordenRes = await pool.query(`
-      SELECT o.id, o.senia, o.total, o.tiene_envio,
+      SELECT o.id, o.senia, o.total, o.tiene_envio, o.fecha_ingreso,
              c.nombre AS cliente, c.telefono
       FROM ordenes o
       JOIN clientes c ON c.id = o.cliente_id
@@ -1338,7 +1338,7 @@ const reimprimirTicketRetiro = async (req, res) => {
 
   try {
     const ordenRes = await pool.query(`
-      SELECT o.id, o.senia, o.total, o.tiene_envio,
+      SELECT o.id, o.senia, o.total, o.tiene_envio, o.fecha_ingreso,
              c.nombre AS cliente
       FROM ordenes o
       JOIN clientes c ON c.id = o.cliente_id
