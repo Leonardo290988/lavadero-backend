@@ -154,30 +154,35 @@ const webhookMercadoPago = async (req, res) => {
       LIMIT 1
     `);
 
-    if (cajaRes.rows.length > 0) {
+    let descripcion = "Pago MercadoPago";
+    if (tipo === "retiro") descripcion = `Pago retiro #${retiro_id}`;
+    if (tipo === "envio")  descripcion = `Pago envío #${envio_id}`;
 
+    if (cajaRes.rows.length > 0) {
+      // Hay caja abierta → impactar directamente
       const caja_id = cajaRes.rows[0].id;
 
-      let descripcion = "Pago MercadoPago";
-
-      if (tipo === "retiro") {
-        descripcion = `Pago retiro #${retiro_id}`;
-      }
-
-      if (tipo === "envio") {
-        descripcion = `Pago envío #${envio_id}`;
-      }
-
       await pool.query(
-        `
-        INSERT INTO caja_movimientos
-        (caja_id, tipo, descripcion, monto, forma_pago)
-        VALUES ($1,'ingreso',$2,$3,'Transferencia/MercadoPago')
-        `,
+        `INSERT INTO caja_movimientos
+         (caja_id, tipo, descripcion, monto, forma_pago, creado_en)
+         VALUES ($1,'ingreso',$2,$3,'Transferencia/MercadoPago',
+                 (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'))`,
         [caja_id, descripcion, monto]
       );
 
-      console.log("💰 Impactado en caja");
+      console.log("💰 Impactado en caja:", descripcion);
+
+    } else {
+      // No hay caja abierta → guardar como pendiente para la próxima apertura
+      await pool.query(
+        `INSERT INTO movimientos_pendientes_caja
+         (tipo, descripcion, monto, forma_pago, creado_en)
+         VALUES ('ingreso',$1,$2,'Transferencia/MercadoPago',
+                 (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'))`,
+        [descripcion, monto]
+      );
+
+      console.log("⏳ Sin caja abierta — guardado como pendiente:", descripcion);
     }
 
     // ===========================

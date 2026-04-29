@@ -51,7 +51,32 @@ const abrirCaja = async (req, res) => {
   [turno, inicio_caja]
 );
 
-    res.json(result.rows[0]);
+    const nuevaCaja = result.rows[0];
+
+    // ======================================
+    // Incorporar movimientos pendientes de caja
+    // (pagos MP que llegaron con la caja cerrada)
+    // ======================================
+    const pendientes = await pool.query(
+      `SELECT * FROM movimientos_pendientes_caja ORDER BY creado_en ASC`
+    );
+
+    if (pendientes.rows.length > 0) {
+      for (const mov of pendientes.rows) {
+        await pool.query(
+          `INSERT INTO caja_movimientos
+           (caja_id, tipo, descripcion, monto, forma_pago, creado_en)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [nuevaCaja.id, mov.tipo, mov.descripcion, mov.monto, mov.forma_pago, mov.creado_en]
+        );
+      }
+
+      await pool.query(`DELETE FROM movimientos_pendientes_caja`);
+
+      console.log(\`✅ Incorporados \${pendientes.rows.length} movimientos pendientes a caja #\${nuevaCaja.id}\`);
+    }
+
+    res.json({ ...nuevaCaja, movimientos_pendientes_incorporados: pendientes.rows.length });
 
   } catch (error) {
     console.error("ERROR abrirCaja:", error);
