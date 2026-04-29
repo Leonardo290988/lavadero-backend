@@ -1299,7 +1299,7 @@ const reimprimirTicketOrden = async (req, res) => {
       items.map(s => ({ descripcion: s.descripcion, precio: s.precio, cantidad: s.cantidad })),
       orden.fecha_ingreso || null
     );
-    subtotalReal -= promoDescuento;
+    // NO restar del subtotal — se pasa el subtotal bruto y el descuento por separado al ticket
 
     const senia = Number(orden.senia || 0);
     const total = Number(orden.total || 0);
