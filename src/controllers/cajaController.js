@@ -73,7 +73,7 @@ const abrirCaja = async (req, res) => {
 
       await pool.query(`DELETE FROM movimientos_pendientes_caja`);
 
-      console.log(`✅ Incorporados ${pendientes.rows.length} movimientos pendientes a caja #${nuevaCaja.id}`);
+      console.log('[OK] Incorporados ' + pendientes.rows.length + ' movimientos pendientes a caja #' + nuevaCaja.id);
     }
 
     res.json({ ...nuevaCaja, movimientos_pendientes_incorporados: pendientes.rows.length });
