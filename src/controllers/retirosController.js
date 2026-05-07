@@ -32,7 +32,7 @@ const crearRetiroPrePago = async (req, res) => {
 
     const { lat, lng } = clienteRes.rows[0];
 
-    const zonaInfo = obtenerZonaCliente(lat, lng);
+    const zonaInfo = await obtenerZonaCliente(lat, lng);
 
     // 🔹 Crear retiro
     const retiroRes = await pool.query(
@@ -101,6 +101,7 @@ const getRetirosPendientes = async (req, res) => {
       r.direccion,
       r.precio,
       r.estado,
+      r.intentos,
       c.nombre AS cliente
     FROM retiros r
     JOIN clientes c ON c.id = r.cliente_id
@@ -128,6 +129,7 @@ const getRetirosCliente = async (req, res) => {
         precio,
         estado,
         tipo,
+        intentos,
         creado_en AS created_at
       FROM retiros
       WHERE cliente_id = $1
@@ -323,6 +325,199 @@ const cancelarRetiroCliente = async (req,res)=>{
 
 
 // ===============================
+// 🆕 MARCAR RETIRO FALLIDO (no se encontró nadie en el domicilio)
+// ===============================
+// - Si es SOLO retiro y falla el 1er intento → cancelado directo
+// - Si es retiro + envío y falla el 1er intento → retiro vuelve a "aceptado"
+//   y el envío se anula
+// - 2do intento fallido (cualquier caso) → cancelado definitivo
+const marcarRetiroFallido = async (req, res) => {
+  const { id } = req.params;
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // 1️⃣ Traer retiro + cliente
+    const retiroRes = await client.query(`
+      SELECT r.*, c.nombre, c.telefono
+      FROM retiros r
+      JOIN clientes c ON c.id = r.cliente_id
+      WHERE r.id = $1
+        AND r.estado = 'en_camino'
+    `, [id]);
+
+    if (retiroRes.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({
+        error: "Retiro no encontrado o no está en camino"
+      });
+    }
+
+    const retiro = retiroRes.rows[0];
+    const intentosPrevios = retiro.intentos || 0;
+    const nuevoIntento = intentosPrevios + 1;
+
+    // 2️⃣ ¿Tenía envío asociado?
+    const envioRes = await client.query(`
+      SELECT id
+      FROM envios
+      WHERE cliente_id = $1
+        AND orden_id IS NULL
+        AND estado IN ('pendiente','aceptado','esperando_pago')
+      LIMIT 1
+    `, [retiro.cliente_id]);
+
+    const teniaEnvio = envioRes.rows.length > 0;
+    const envioId = teniaEnvio ? envioRes.rows[0].id : null;
+
+    // 3️⃣ Decidir qué hacer según el caso
+    let accion = ""; // "reprogramado" | "cancelado"
+
+    if (nuevoIntento >= 2) {
+      // 2do intento fallido → cancelado definitivo
+      accion = "cancelado";
+    } else if (teniaEnvio) {
+      // 1er intento fallido + tenía envío → reprogramar (sin envío)
+      accion = "reprogramado";
+    } else {
+      // 1er intento fallido + sin envío → cancelado directo
+      accion = "cancelado";
+    }
+
+    // 4️⃣ Aplicar cambios
+    if (accion === "reprogramado") {
+      await client.query(`
+        UPDATE retiros
+        SET estado = 'aceptado',
+            intentos = $1
+        WHERE id = $2
+      `, [nuevoIntento, id]);
+
+      // Cancelar el envío
+      if (envioId) {
+        await client.query(`
+          UPDATE envios
+          SET estado = 'cancelado'
+          WHERE id = $1
+        `, [envioId]);
+      }
+    } else {
+      // Cancelado
+      await client.query(`
+        UPDATE retiros
+        SET estado = 'fallido',
+            intentos = $1
+        WHERE id = $2
+      `, [nuevoIntento, id]);
+
+      // Si tenía envío, también cancelarlo
+      if (envioId) {
+        await client.query(`
+          UPDATE envios
+          SET estado = 'cancelado'
+          WHERE id = $1
+        `, [envioId]);
+      }
+    }
+
+    await client.query("COMMIT");
+
+    res.json({
+      ok: true,
+      accion,
+      intentos: nuevoIntento,
+      tenia_envio: teniaEnvio
+    });
+
+    // 5️⃣ 🔔 Notificación push + WhatsApp según el caso
+    if (accion === "reprogramado") {
+      // Reprogramado: 1er intento fallido + tenía envío
+      notificarCliente(
+        retiro.cliente_id,
+        "⚠️ No pudimos retirar tu ropa",
+        "Pasamos por tu domicilio y no había nadie. Reprogramamos para el día siguiente. Tu envío fue anulado: si querés envío deberás abonarlo nuevamente.",
+        { tipo: "retiro_fallido_reprogramado", retiro_id: retiro.id }
+      );
+
+      if (retiro.telefono) {
+        const mensaje = `🧺 *Lavaderos Moreno*
+
+Hola ${retiro.nombre} 👋
+
+Pasamos por tu domicilio para retirar tu ropa pero *no había nadie* 🏚️
+
+🔄 *Reprogramamos el retiro para el día siguiente*, en el mismo horario (16 a 18hs).
+
+⚠️ *Importante:* tu envío a domicilio quedó *anulado*. Si querés que volvamos a entregarte la ropa en tu domicilio cuando esté lista, deberás abonar el envío nuevamente desde la app.
+
+📌 Por favor, asegurate de estar presente en el próximo intento. Si vuelve a fallar, deberás solicitar y abonar el retiro nuevamente.
+
+Cualquier consulta escribinos 😊`.trim();
+
+        try {
+          await enviarWhatsApp({ telefono: retiro.telefono, mensaje });
+        } catch (e) {
+          console.error("Error enviando WhatsApp retiro fallido reprogramado:", e.message);
+        }
+      }
+    } else {
+      // Cancelado definitivo (1er intento sin envío, o 2do intento)
+      const esSegundoIntento = nuevoIntento >= 2;
+
+      notificarCliente(
+        retiro.cliente_id,
+        "❌ Retiro cancelado",
+        esSegundoIntento
+          ? "Pasamos por segunda vez y no pudimos retirar tu ropa. Para volver a solicitar el servicio deberás abonar nuevamente desde la app."
+          : "Pasamos por tu domicilio y no había nadie. Para volver a solicitar el retiro deberás abonarlo nuevamente desde la app.",
+        { tipo: "retiro_cancelado", retiro_id: retiro.id }
+      );
+
+      if (retiro.telefono) {
+        const mensaje = esSegundoIntento
+          ? `🧺 *Lavaderos Moreno*
+
+Hola ${retiro.nombre} 👋
+
+Pasamos por *segunda vez* a retirar tu ropa pero nuevamente *no había nadie* en el domicilio 🏚️
+
+❌ Por este motivo el pedido de retiro queda *cancelado*.
+
+🔄 Si querés volver a solicitar el servicio, deberás *abonarlo nuevamente* desde la app.
+
+Cualquier consulta escribinos 😊`.trim()
+          : `🧺 *Lavaderos Moreno*
+
+Hola ${retiro.nombre} 👋
+
+Pasamos por tu domicilio para retirar tu ropa pero *no había nadie* 🏚️
+
+❌ Por este motivo el pedido queda *cancelado*.
+
+🔄 Si querés volver a solicitar el retiro, deberás *abonarlo nuevamente* desde la app.
+
+Cualquier consulta escribinos 😊`.trim();
+
+        try {
+          await enviarWhatsApp({ telefono: retiro.telefono, mensaje });
+        } catch (e) {
+          console.error("Error enviando WhatsApp retiro cancelado:", e.message);
+        }
+      }
+    }
+
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error marcarRetiroFallido:", error);
+    res.status(500).json({ error: "Error marcando retiro fallido" });
+  } finally {
+    client.release();
+  }
+};
+
+
+// ===============================
 // MARCAR EN CAMINO
 // ===============================
 const marcarEnCamino = async (req,res)=>{
@@ -411,7 +606,7 @@ const obtenerPreviewRetiro = async (req, res) => {
 
     const cliente = clienteRes.rows[0];
 
-    const zonaInfo = obtenerZonaCliente(cliente.lat, cliente.lng);
+    const zonaInfo = await obtenerZonaCliente(cliente.lat, cliente.lng);
 
     res.json({
       ok: true,
@@ -560,5 +755,6 @@ module.exports = {
   getRetirosCliente,
   obtenerPreviewRetiro,
   marcarRetirado,
-  marcarEnCamino
+  marcarEnCamino,
+  marcarRetiroFallido
 };

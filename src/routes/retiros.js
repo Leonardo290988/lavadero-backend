@@ -10,6 +10,7 @@ const {
   rechazarRetiro,
   marcarEnCamino,
   marcarRetirado,
+  marcarRetiroFallido,
   obtenerPreviewRetiro,
   cancelarRetiroCliente
 } = require("../controllers/retirosController");
@@ -28,6 +29,9 @@ router.get("/cliente/:id", getRetirosCliente);
 // Local acepta retiro
 router.put("/:id/aceptar", aceptarRetiro);
 router.put("/:id/retirado", marcarRetirado);
+
+// 🆕 Local marca el retiro como fallido (no había nadie en el domicilio)
+router.put("/:id/fallido", marcarRetiroFallido);
 
 // Local rechaza retiro
 router.put("/:id/rechazar", rechazarRetiro);
