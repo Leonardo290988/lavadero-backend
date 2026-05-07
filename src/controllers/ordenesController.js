@@ -1532,6 +1532,66 @@ const registrarRecordatorio = async (req, res) => {
   }
 };
 
+// ======================================================================
+// 🆕 GET /ordenes/cliente/:id/listas
+// Devuelve las órdenes en estado 'lista' del cliente que NO tienen envío.
+// La app las usa para:
+//   1) bloquear el flujo de "Pedir retiro" si tiene alguna lista
+//   2) mostrar checkbox "incluir también orden #X" al pedir envío
+// ======================================================================
+const getOrdenesListasCliente = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const r = await pool.query(`
+      SELECT
+        o.id,
+        o.estado,
+        TO_CHAR(o.fecha_ingreso, 'YYYY-MM-DD HH24:MI:SS') AS fecha_ingreso,
+        COALESCE(o.total, 0) AS total,
+        o.tiene_envio
+      FROM ordenes o
+      WHERE o.cliente_id = $1
+        AND o.estado = 'lista'
+        AND (o.tiene_envio = false OR o.tiene_envio IS NULL)
+      ORDER BY o.id ASC
+    `, [id]);
+
+    res.json(r.rows);
+  } catch (error) {
+    console.error("ERROR getOrdenesListasCliente:", error);
+    res.status(500).json([]);
+  }
+};
+
+// ======================================================================
+// 🆕 GET /ordenes/cliente/:id/en-curso
+// Devuelve las órdenes que están EN PROCESO (todavía no listas).
+// La app la usa para mostrar un aviso al cliente cuando intenta
+// pedir un nuevo retiro y ya tiene una orden en curso.
+// ======================================================================
+const getOrdenesEnCursoCliente = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const r = await pool.query(`
+      SELECT
+        o.id,
+        o.estado,
+        TO_CHAR(o.fecha_ingreso, 'YYYY-MM-DD HH24:MI:SS') AS fecha_ingreso
+      FROM ordenes o
+      WHERE o.cliente_id = $1
+        AND o.estado IN ('ingresado','abierta','confirmada','en_proceso')
+      ORDER BY o.id ASC
+    `, [id]);
+
+    res.json(r.rows);
+  } catch (error) {
+    console.error("ERROR getOrdenesEnCursoCliente:", error);
+    res.status(500).json([]);
+  }
+};
+
 module.exports = {
   imprimirTicket,
   getOrdenesRetiradas,
@@ -1546,6 +1606,8 @@ module.exports = {
   agregarServicioAOrden,
   getServiciosDeOrden,
   getOrdenesCliente,
+  getOrdenesListasCliente,
+  getOrdenesEnCursoCliente,
   actualizarSenia,
   cerrarOrden,
   getOrdenesAbiertas,

@@ -25,7 +25,7 @@ const crearEnvioPrePago = async (req, res) => {
 
     const { lat, lng } = clienteRes.rows[0];
 
-    const zonaInfo = obtenerZonaCliente(lat, lng);
+    const zonaInfo = await obtenerZonaCliente(lat, lng);
 
 
     // 0️⃣ Verificar si ya hay envio esperando_pago
@@ -216,20 +216,43 @@ const entregarEnvio = async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    // Buscar envio
+    // Buscar envio + total sumado de TODAS las órdenes asociadas
     const envioRes = await client.query(`
-      SELECT e.id, e.orden_id, o.total, o.senia
+      SELECT
+        e.id,
+        e.orden_id,
+        e.cliente_id,
+        COALESCE(SUM(o.total), 0) AS total_sum,
+        COALESCE(SUM(o.senia), 0) AS senia_sum,
+        ARRAY_AGG(o.id) AS ordenes_asociadas
       FROM envios e
-      JOIN ordenes o ON o.id = e.orden_id
+      JOIN envio_ordenes eo ON eo.envio_id = e.id
+      JOIN ordenes o ON o.id = eo.orden_id
       WHERE e.id = $1
         AND e.estado IN ('pendiente','en_camino')
+      GROUP BY e.id, e.orden_id, e.cliente_id
     `, [id]);
 
     if (envioRes.rows.length === 0) {
-      return res.status(404).json({ error: "Envío no encontrado" });
+      // Fallback: envío viejo sin registro en envio_ordenes
+      const fallbackRes = await client.query(`
+        SELECT e.id, e.orden_id, e.cliente_id, o.total AS total_sum, o.senia AS senia_sum,
+               ARRAY[o.id] AS ordenes_asociadas
+        FROM envios e
+        JOIN ordenes o ON o.id = e.orden_id
+        WHERE e.id = $1
+          AND e.estado IN ('pendiente','en_camino')
+      `, [id]);
+
+      if (fallbackRes.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "Envío no encontrado" });
+      }
+      envioRes.rows = fallbackRes.rows;
     }
 
     const envio = envioRes.rows[0];
+    const ordenesAsociadas = envio.ordenes_asociadas || [envio.orden_id];
 
     // Buscar caja abierta
     const cajaRes = await client.query(`
@@ -241,14 +264,15 @@ const entregarEnvio = async (req, res) => {
     `);
 
     if (cajaRes.rows.length === 0) {
+      await client.query("ROLLBACK");
       return res.status(400).json({ error: "No hay caja abierta" });
     }
 
     const caja_id = cajaRes.rows[0].id;
 
     // Calcular restante
-    const total = Number(envio.total);
-    const senia = Number(envio.senia) || 0;
+    const total = Number(envio.total_sum);
+    const senia = Number(envio.senia_sum) || 0;
     const restante = total - senia;
 
     // Marcar envio entregado
@@ -258,12 +282,12 @@ const entregarEnvio = async (req, res) => {
       WHERE id=$1
     `, [id]);
 
-// 🔥 NUEVO: Marcar orden como entregada
-await client.query(`
-  UPDATE ordenes
-  SET estado='entregada'
-  WHERE id=$1
-`, [envio.orden_id]);
+    // 🔥 Marcar TODAS las órdenes asociadas como entregadas
+    await client.query(`
+      UPDATE ordenes
+      SET estado='entregada'
+      WHERE id = ANY($1::int[])
+    `, [ordenesAsociadas]);
 
     // Registrar ingreso
     if (restante > 0) {
@@ -273,7 +297,9 @@ await client.query(`
         VALUES ($1,'ingreso',$2,$3,$4,(NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'))
       `, [
         caja_id,
-        `Cobro envío orden #${envio.orden_id}`,
+        ordenesAsociadas.length > 1
+          ? `Cobro envío órdenes #${ordenesAsociadas.join(', #')}`
+          : `Cobro envío orden #${envio.orden_id}`,
         restante,
         metodo_pago === "Efectivo"
           ? "Efectivo"
@@ -283,7 +309,7 @@ await client.query(`
 
     await client.query("COMMIT");
 
-    res.json({ ok: true });
+    res.json({ ok: true, ordenes_entregadas: ordenesAsociadas });
 
     // 🔔 Notificar al cliente que su pedido fue entregado en su domicilio
     try {
@@ -292,10 +318,13 @@ await client.query(`
         [envio.orden_id]
       );
       if (clienteRes.rows.length > 0) {
+        const detalleOrdenes = ordenesAsociadas.length > 1
+          ? `tus órdenes #${ordenesAsociadas.join(', #')} fueron entregadas`
+          : `tu orden #${envio.orden_id} fue entregada`;
         notificarCliente(
           clienteRes.rows[0].cliente_id,
           "📦 Pedido entregado",
-          `Tu orden #${envio.orden_id} fue entregada en tu domicilio. ¡Gracias por elegirnos!`,
+          `${detalleOrdenes} en tu domicilio. ¡Gracias por elegirnos!`,
           { tipo: "envio_entregado", orden_id: envio.orden_id }
         );
       }
@@ -377,49 +406,95 @@ const getEnvioActivo = async (req, res) => {
 };
 
 // POST /envios/desde-orden
+// Acepta:
+//   { orden_id: 123 }                    → un envío para 1 orden
+//   { orden_ids: [123, 124, 125] }       → un envío para varias órdenes
 const crearEnvioDesdeOrden = async (req, res) => {
-  const { orden_id } = req.body;
+  let { orden_id, orden_ids } = req.body;
+
+  // Normalizar entrada: siempre trabajamos con array
+  if (!orden_ids && orden_id) {
+    orden_ids = [orden_id];
+  }
+  if (!Array.isArray(orden_ids) || orden_ids.length === 0) {
+    return res.status(400).json({ error: "Falta orden_id u orden_ids" });
+  }
+
+  const client = await pool.connect();
 
   try {
+    await client.query("BEGIN");
 
-    const ordenRes = await pool.query(`
-      SELECT o.cliente_id, c.lat, c.lng, c.direccion
+    // Validar que todas las órdenes sean del mismo cliente, estén listas y sin envío
+    const ordenesRes = await client.query(`
+      SELECT o.id, o.cliente_id, c.lat, c.lng, c.direccion
       FROM ordenes o
       JOIN clientes c ON c.id = o.cliente_id
-      WHERE o.id = $1
+      WHERE o.id = ANY($1::int[])
         AND o.estado = 'lista'
         AND (o.tiene_envio = false OR o.tiene_envio IS NULL)
-    `, [orden_id]);
+    `, [orden_ids]);
 
-    if (ordenRes.rows.length === 0) {
-      return res.status(400).json({ error: "Orden no válida para envío" });
+    if (ordenesRes.rows.length !== orden_ids.length) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error: "Una o más órdenes no son válidas (deben estar listas y sin envío)"
+      });
     }
 
-    const { cliente_id, lat, lng, direccion } = ordenRes.rows[0];
+    const clienteIds = [...new Set(ordenesRes.rows.map(o => o.cliente_id))];
+    if (clienteIds.length > 1) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error: "Las órdenes pertenecen a clientes distintos"
+      });
+    }
 
-    const zonaInfo = obtenerZonaCliente(lat, lng);
+    const { cliente_id, lat, lng, direccion } = ordenesRes.rows[0];
+    const zonaInfo = await obtenerZonaCliente(lat, lng);
 
-    const result = await pool.query(`
+    // Creamos UN solo envío (orden_id = la primera orden, como referencia principal)
+    // Pero asociamos TODAS las órdenes en envio_ordenes
+    const ordenPrincipal = orden_ids[0];
+
+    const result = await client.query(`
       INSERT INTO envios
       (cliente_id, orden_id, zona, direccion, precio, estado, tipo)
       VALUES ($1,$2,$3,$4,$5,'esperando_pago','envio')
       RETURNING *
     `, [
       cliente_id,
-      orden_id,
+      ordenPrincipal,
       zonaInfo.zona,
       direccion,
       zonaInfo.precio
     ]);
 
+    const envio = result.rows[0];
+
+    // Insertar la relación N:N en envio_ordenes
+    for (const oid of orden_ids) {
+      await client.query(`
+        INSERT INTO envio_ordenes (envio_id, orden_id)
+        VALUES ($1, $2)
+        ON CONFLICT (envio_id, orden_id) DO NOTHING
+      `, [envio.id, oid]);
+    }
+
+    await client.query("COMMIT");
+
     res.json({
       ok: true,
-      envio: result.rows[0]
+      envio,
+      ordenes_asociadas: orden_ids
     });
 
   } catch (error) {
+    await client.query("ROLLBACK");
     console.error("Error creando envío desde orden:", error);
     res.status(500).json({ error: "Error creando envío" });
+  } finally {
+    client.release();
   }
 };
 

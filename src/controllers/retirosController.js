@@ -102,7 +102,13 @@ const getRetirosPendientes = async (req, res) => {
       r.precio,
       r.estado,
       r.intentos,
-      c.nombre AS cliente
+      c.nombre AS cliente,
+      EXISTS (
+        SELECT 1 FROM envios e
+        WHERE e.cliente_id = r.cliente_id
+          AND e.orden_id IS NULL
+          AND e.estado IN ('pendiente','aceptado','esperando_pago')
+      ) AS quiere_envio
     FROM retiros r
     JOIN clientes c ON c.id = r.cliente_id
     WHERE r.estado IN ('pendiente', 'aceptado', 'en_camino')
@@ -710,6 +716,13 @@ const marcarRetirado = async (req,res)=>{
         SET orden_id=$1
         WHERE id=$2
       `,[orden.id, envioRes.rows[0].id]);
+
+      // 🆕 Registrar también en la tabla N:N
+      await client.query(`
+        INSERT INTO envio_ordenes (envio_id, orden_id)
+        VALUES ($1, $2)
+        ON CONFLICT (envio_id, orden_id) DO NOTHING
+      `, [envioRes.rows[0].id, orden.id]);
     }
 
     await client.query(`

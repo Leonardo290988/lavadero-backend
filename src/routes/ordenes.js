@@ -3,6 +3,8 @@ const router = express.Router();
 
 const {
   getOrdenesCliente,
+  getOrdenesListasCliente,
+  getOrdenesEnCursoCliente,
   getRetirosHoy,
   getRetiros,
   eliminarServicioDeOrden,
@@ -27,14 +29,8 @@ const {
   actualizarNotas
 } = require('../controllers/ordenesController');
 
-console.log({
-  getOrdenes,
-  crearOrden,
-  agregarServicioAOrden,
-  getServiciosDeOrden,
-  getOrdenesAbiertas,
-  getDetalleOrden   
-});
+router.get("/cliente/:id/listas", getOrdenesListasCliente); // 🆕 ANTES de /cliente/:clienteId
+router.get("/cliente/:id/en-curso", getOrdenesEnCursoCliente); // 🆕
 router.get("/cliente/:clienteId", getOrdenesCliente);
 router.get('/abiertas', getOrdenesAbiertas);
 router.get('/retiradas', getOrdenesRetiradas);
