@@ -162,20 +162,13 @@ const getClienteById = async (req, res) => {
   }
 };
 
-module.exports = {
-  getClientes,
-  loginCliente,
-  getClienteById,
-  buscarClientes,
-  createCliente
-};
 // ======================================
 // CLIENTES INACTIVOS (sin órdenes en 45 días)
 // ======================================
 const getClientesInactivos = async (req, res) => {
   try {
     const r = await pool.query(`
-      SELECT 
+      SELECT
         c.id,
         c.nombre,
         c.telefono,
@@ -187,7 +180,7 @@ const getClientesInactivos = async (req, res) => {
       LEFT JOIN clientes_contactados cc ON cc.cliente_id = c.id
       WHERE c.telefono IS NOT NULL AND c.telefono != ''
       GROUP BY c.id, c.nombre, c.telefono, cc.ultimo_contacto
-      HAVING 
+      HAVING
         MAX(o.fecha_ingreso) < NOW() - INTERVAL '45 days'
         OR MAX(o.fecha_ingreso) IS NULL
       ORDER BY ultima_orden ASC NULLS FIRST
@@ -218,8 +211,38 @@ const marcarContactado = async (req, res) => {
   }
 };
 
+// ======================================
+// 🔔 GUARDAR PUSH TOKEN (APP CLIENTE)
+// La app llama a este endpoint después del login
+// ======================================
+const guardarPushToken = async (req, res) => {
+  const { cliente_id, push_token } = req.body;
+
+  if (!cliente_id || !push_token) {
+    return res.status(400).json({ error: "Faltan datos (cliente_id y push_token)" });
+  }
+
+  try {
+    await pool.query(
+      `UPDATE clientes SET push_token = $1 WHERE id = $2`,
+      [push_token, cliente_id]
+    );
+
+    console.log(`🔔 Push token guardado para cliente ${cliente_id}`);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("ERROR guardarPushToken:", error);
+    res.status(500).json({ error: "Error guardando push token" });
+  }
+};
+
 module.exports = {
-  ...module.exports,
+  getClientes,
+  loginCliente,
+  getClienteById,
+  buscarClientes,
+  createCliente,
   getClientesInactivos,
-  marcarContactado
+  marcarContactado,
+  guardarPushToken
 };

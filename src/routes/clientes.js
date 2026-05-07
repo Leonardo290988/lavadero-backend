@@ -8,7 +8,8 @@ const {
   createCliente,
   buscarClientes,
   getClientesInactivos,
-  marcarContactado
+  marcarContactado,
+  guardarPushToken
 } = require('../controllers/clientesController');
 
 // ⚠️ SEARCH SIEMPRE VA ANTES DE '/'
@@ -16,10 +17,13 @@ router.get('/search', buscarClientes);
 router.get('/inactivos', getClientesInactivos);
 router.post('/contactado/:clienteId', marcarContactado);
 router.post("/login", loginCliente);
+
+// 🔔 Push token de la app del cliente
+router.post('/push-token', guardarPushToken);
+
 router.get('/:id', getClienteById);
 
 router.get('/', getClientes);
 router.post('/', createCliente);
 
 module.exports = router;
-

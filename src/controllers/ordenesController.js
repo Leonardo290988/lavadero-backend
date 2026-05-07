@@ -1,5 +1,6 @@
 const pool = require('../db');
 const enviarWhatsApp = require('../helpers/enviarWhatsApp');
+const notificarCliente = require('../helpers/notificarCliente');
 const generarTicketOrden = require("../utils/generarTicketOrden");
 const imprimirTicket = require("../utils/imprimirTicket");
 const generarTicketRopa = require("../utils/generarTicketRopa");
@@ -439,6 +440,19 @@ const cerrarOrden = async (req, res) => {
       return res.status(404).json({ error: 'Orden no encontrada' });
     }
 
+    // 🔔 Notificar al cliente que su ropa está lista
+    {
+      const tieneEnvio = ordenResult.rows[0].tiene_envio;
+      notificarCliente(
+        ordenResult.rows[0].cliente_id,
+        "✨ Tu ropa está lista",
+        tieneEnvio
+          ? `Orden #${id} lista. Te la enviamos a domicilio en breve 🚚`
+          : `Orden #${id} lista para retirar en el local.`,
+        { tipo: "orden_lista", orden_id: id }
+      );
+    }
+
     // ===============================
     // 🚚 VINCULAR ENVÍO PREPAGO
     // Solo aplica si tiene_envio=true Y el envío aún no está vinculado
@@ -771,6 +785,14 @@ WHERE o.id=$1
     // 🏆 Sumar puntos al cliente por orden retirada y pagada
     const { sumarPuntos } = require("./puntosController");
     await sumarPuntos(ord.rows[0].cliente_id, total, pool);
+
+    // 🔔 Notificar al cliente que retiró su pedido
+    notificarCliente(
+      ord.rows[0].cliente_id,
+      "📦 Pedido entregado",
+      `Tu orden #${id} fue retirada con éxito. ¡Gracias por elegirnos!`,
+      { tipo: "orden_entregada", orden_id: id }
+    );
 
  const itemsRes = await pool.query(`
   SELECT s.nombre AS descripcion,
@@ -1125,6 +1147,14 @@ if (total < 0) total = 0;
       SET estado='confirmada', total=$1
       WHERE id=$2
     `, [total, id]);
+
+    // 🔔 Notificar al cliente que su orden fue confirmada
+    notificarCliente(
+      orden.cliente_id,
+      "✅ Pedido confirmado",
+      `Tu orden #${id} fue confirmada y ya está en proceso.`,
+      { tipo: "orden_confirmada", orden_id: id }
+    );
 
     // Generar ticket PDF
 await generarTicketOrden({

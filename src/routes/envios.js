@@ -8,7 +8,8 @@ const {
   entregarEnvio,
   getEnviosEntregados,
   getEnviosPendientes,
-  envioFallido
+  envioFallido,
+  marcarEnvioEnCamino
 } = require("../controllers/enviosController");
 
 router.get("/activo", getEnvioActivo);
@@ -18,6 +19,7 @@ router.post("/desde-orden", crearEnvioDesdeOrden);
 
 router.put("/:id/entregar", entregarEnvio);
 router.put("/:id/fallido", envioFallido);
+router.put("/:id/en-camino", marcarEnvioEnCamino); // 🆕
 router.get("/entregados", getEnviosEntregados);
 
 module.exports = router;

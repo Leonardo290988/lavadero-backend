@@ -5,6 +5,7 @@ const generarTicketProvisorio = require("../utils/generarTicketProvisorio");
 const obtenerZonaCliente = require("../helpers/zonaCliente");
 const enviarPushNotification = require("../helpers/enviarPushNotification");
 const enviarWhatsApp = require("../helpers/enviarWhatsApp");
+const notificarCliente = require("../helpers/notificarCliente"); // 🆕
 
 
 
@@ -93,7 +94,7 @@ const crearRetiroPrePago = async (req, res) => {
 // ===============================
 const getRetirosPendientes = async (req, res) => {
   const r = await pool.query(`
-    SELECT 
+    SELECT
       r.id,
       r.tipo,
       r.zona,
@@ -103,11 +104,58 @@ const getRetirosPendientes = async (req, res) => {
       c.nombre AS cliente
     FROM retiros r
     JOIN clientes c ON c.id = r.cliente_id
-    WHERE r.estado IN ('pendiente', 'aceptado', 'en_camino') 
+    WHERE r.estado IN ('pendiente', 'aceptado', 'en_camino')
     ORDER BY r.creado_en ASC
   `);
 
   res.json(r.rows);
+};
+
+// ===============================
+// 🆕 LISTAR RETIROS DE UN CLIENTE
+// (para la pantalla "Mis órdenes" de la app)
+// ===============================
+const getRetirosCliente = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const r = await pool.query(`
+      SELECT
+        id,
+        cliente_id,
+        zona,
+        direccion,
+        precio,
+        estado,
+        tipo,
+        creado_en AS created_at
+      FROM retiros
+      WHERE cliente_id = $1
+        AND estado IN ('pendiente','aceptado','en_camino')
+      ORDER BY creado_en DESC
+    `, [id]);
+
+    // Sumamos info de envío si existe (para mostrar "Incluye envío")
+    const enriched = await Promise.all(r.rows.map(async (ret) => {
+      const envio = await pool.query(`
+        SELECT id FROM envios
+        WHERE cliente_id = $1
+          AND orden_id IS NULL
+          AND estado IN ('pendiente','aceptado','esperando_pago')
+        LIMIT 1
+      `, [ret.cliente_id]);
+
+      return {
+        ...ret,
+        quiere_envio: envio.rows.length > 0,
+      };
+    }));
+
+    res.json(enriched);
+  } catch (error) {
+    console.error("ERROR getRetirosCliente:", error);
+    res.status(500).json([]);
+  }
 };
 
 // ===============================
@@ -149,7 +197,7 @@ const aceptarRetiro = async (req, res) => {
 
     // 3️⃣ Generar ticket provisorio (sin orden todavía)
     const nombreArchivo = await generarTicketProvisorio({
-      id: retiro.id, // usamos el ID del retiro
+      id: retiro.id,
       cliente: retiro.nombre,
       telefono: retiro.telefono,
       direccion: retiro.direccion,
@@ -161,16 +209,25 @@ const aceptarRetiro = async (req, res) => {
       pdf: `/pdf/provisorios/${nombreArchivo}`
     });
 
-    // 4️⃣ Enviar WhatsApp al cliente
-    if (retiro.telefono) {
-      const horaArgentina = new Date().toLocaleString("es-AR", {
-        timeZone: "America/Argentina/Buenos_Aires",
-        hour: "numeric", hour12: false
-      });
-      const horaActual = parseInt(horaArgentina);
-      const esHoy = horaActual < 15;
-      const diaRetiro = esHoy ? "hoy" : "mañana";
+    // 4️⃣ Calcular si es hoy o mañana
+    const horaArgentina = new Date().toLocaleString("es-AR", {
+      timeZone: "America/Argentina/Buenos_Aires",
+      hour: "numeric", hour12: false
+    });
+    const horaActual = parseInt(horaArgentina);
+    const esHoy = horaActual < 15;
+    const diaRetiro = esHoy ? "hoy" : "mañana";
 
+    // 5️⃣ 🔔 PUSH a la app del cliente
+    notificarCliente(
+      retiro.cliente_id,
+      "✅ Retiro aceptado",
+      `Pasaremos ${diaRetiro} entre las 16 y 18 hs por tu domicilio.`,
+      { tipo: "retiro_aceptado", retiro_id: retiro.id }
+    );
+
+    // 6️⃣ WhatsApp al cliente
+    if (retiro.telefono) {
       const mensaje = `🧺 *Lavaderos Moreno*
 
 Hola ${retiro.nombre}! 👋
@@ -199,6 +256,7 @@ Cualquier consulta escribinos 😊`.trim();
     client.release();
   }
 };
+
 // ===============================
 // RECHAZAR RETIRO (local)
 // ===============================
@@ -218,7 +276,17 @@ const rechazarRetiro = async (req,res)=>{
       return res.status(404).json({error:"Retiro no encontrado"});
     }
 
+    const retiro = r.rows[0];
+
     res.json({ok:true});
+
+    // 🔔 Notificar al cliente del rechazo
+    notificarCliente(
+      retiro.cliente_id,
+      "❌ Retiro rechazado",
+      "Lamentamos informarte que tu solicitud de retiro no pudo ser aceptada. Comunicate con nosotros para más info.",
+      { tipo: "retiro_rechazado", retiro_id: retiro.id }
+    );
 
   } catch(error){
     console.error(error);
@@ -276,7 +344,15 @@ const marcarEnCamino = async (req,res)=>{
 
     res.json({ ok: true, estado: "en_camino" });
 
-    // Enviar WhatsApp
+    // 🔔 Push a la app del cliente
+    notificarCliente(
+      retiro.cliente_id,
+      "🚚 Vamos en camino",
+      "Salimos a retirar tu ropa. Estate atento al timbre 🛎️",
+      { tipo: "retiro_en_camino", retiro_id: retiro.id }
+    );
+
+    // WhatsApp al cliente
     const clienteRes = await pool.query(
       `SELECT nombre, telefono FROM clientes WHERE id = $1`,
       [retiro.cliente_id]
@@ -320,7 +396,6 @@ const obtenerPreviewRetiro = async (req, res) => {
       return res.status(400).json({ error: "clienteId requerido" });
     }
 
-    // 1️⃣ Buscar cliente
     const clienteRes = await pool.query(
       `
       SELECT direccion, lat, lng
@@ -336,10 +411,8 @@ const obtenerPreviewRetiro = async (req, res) => {
 
     const cliente = clienteRes.rows[0];
 
-    // 2️⃣ Calcular zona y precio
     const zonaInfo = obtenerZonaCliente(cliente.lat, cliente.lng);
 
-    // 3️⃣ Responder preview
     res.json({
       ok: true,
       direccion: cliente.direccion,
@@ -395,7 +468,6 @@ const marcarRetirado = async (req,res)=>{
   try {
     await client.query("BEGIN");
 
-    // 1️⃣ Traer retiro
     const retiroRes = await client.query(`
       SELECT *
       FROM retiros
@@ -408,7 +480,6 @@ const marcarRetirado = async (req,res)=>{
 
     const retiro = retiroRes.rows[0];
 
-    // 2️⃣ Crear orden ahora
     const ordenRes = await client.query(`
       INSERT INTO ordenes
       (cliente_id, estado, fecha_ingreso, tiene_envio)
@@ -420,7 +491,6 @@ const marcarRetirado = async (req,res)=>{
 
     let tieneEnvio = false;
 
-    // 3️⃣ Ver si existe envío prepago sin vincular
     const envioRes = await client.query(`
       SELECT id
       FROM envios
@@ -434,14 +504,12 @@ const marcarRetirado = async (req,res)=>{
 
       tieneEnvio = true;
 
-      // marcar orden con envío
       await client.query(`
         UPDATE ordenes
         SET tiene_envio=true
         WHERE id=$1
       `,[orden.id]);
 
-      // vincular envío a orden
       await client.query(`
         UPDATE envios
         SET orden_id=$1
@@ -449,7 +517,6 @@ const marcarRetirado = async (req,res)=>{
       `,[orden.id, envioRes.rows[0].id]);
     }
 
-    // 4️⃣ Actualizar retiro
     await client.query(`
       UPDATE retiros
       SET estado='retirado',
@@ -464,6 +531,14 @@ const marcarRetirado = async (req,res)=>{
       orden_id: orden.id,
       tiene_envio: tieneEnvio
     });
+
+    // 🔔 Push: ya pasamos a retirar tu ropa
+    notificarCliente(
+      retiro.cliente_id,
+      "📦 Ropa retirada",
+      `Tu ropa fue retirada con éxito. Te avisaremos cuando esté lista (orden #${orden.id}).`,
+      { tipo: "retiro_completado", orden_id: orden.id }
+    );
 
   } catch(error){
     await client.query("ROLLBACK");
@@ -482,6 +557,7 @@ module.exports = {
   rechazarRetiro,
   cancelarRetiroCliente,
   getRetirosPendientes,
+  getRetirosCliente,
   obtenerPreviewRetiro,
   marcarRetirado,
   marcarEnCamino
