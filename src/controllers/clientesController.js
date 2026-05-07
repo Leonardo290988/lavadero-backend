@@ -236,6 +236,60 @@ const guardarPushToken = async (req, res) => {
   }
 };
 
+// ======================================
+// 🆕 ACTUALIZAR CLIENTE (APP)
+// Le permite al cliente cambiar su dirección desde la app
+// ======================================
+const actualizarCliente = async (req, res) => {
+  const { id } = req.params;
+  const { nombre, direccion } = req.body;
+
+  if (!direccion || direccion.trim().length < 10) {
+    return res.status(400).json({
+      error: "Dirección inválida. Debe incluir calle, número, localidad y provincia."
+    });
+  }
+
+  try {
+    // Re-geocodificar la nueva dirección
+    let lat = null;
+    let lng = null;
+    try {
+      const coords = await geocodeDireccion(direccion);
+      lat = coords.lat;
+      lng = coords.lng;
+    } catch (geoError) {
+      return res.status(400).json({
+        error: geoError.message || "No pudimos ubicar esa dirección. Verificá que esté completa."
+      });
+    }
+
+    const result = await pool.query(
+      `
+      UPDATE clientes
+      SET nombre = COALESCE($1, nombre),
+          direccion = $2,
+          lat = $3,
+          lng = $4
+      WHERE id = $5
+      RETURNING id, nombre, telefono, direccion, lat, lng
+      `,
+      [nombre || null, direccion, lat, lng, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Cliente no encontrado" });
+    }
+
+    console.log(`✏️  Cliente ${id} actualizó dirección a "${direccion}"`);
+
+    res.json({ ok: true, cliente: result.rows[0] });
+  } catch (error) {
+    console.error("ERROR actualizarCliente:", error);
+    res.status(500).json({ error: "Error actualizando cliente" });
+  }
+};
+
 module.exports = {
   getClientes,
   loginCliente,
@@ -244,5 +298,6 @@ module.exports = {
   createCliente,
   getClientesInactivos,
   marcarContactado,
-  guardarPushToken
+  guardarPushToken,
+  actualizarCliente
 };

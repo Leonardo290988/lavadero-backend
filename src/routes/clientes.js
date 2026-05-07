@@ -9,7 +9,8 @@ const {
   buscarClientes,
   getClientesInactivos,
   marcarContactado,
-  guardarPushToken
+  guardarPushToken,
+  actualizarCliente
 } = require('../controllers/clientesController');
 
 // ⚠️ SEARCH SIEMPRE VA ANTES DE '/'
@@ -20,6 +21,9 @@ router.post("/login", loginCliente);
 
 // 🔔 Push token de la app del cliente
 router.post('/push-token', guardarPushToken);
+
+// 🆕 Actualizar datos del cliente desde la app
+router.put('/:id', actualizarCliente);
 
 router.get('/:id', getClienteById);
 
