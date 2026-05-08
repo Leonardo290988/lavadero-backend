@@ -580,7 +580,14 @@ const getOrdenesListasParaRetiro = async (req, res) => {
         o.fecha_lista,
         o.total,
         o.senia,
-        (o.total - COALESCE(o.senia,0)) AS total_a_pagar
+        o.multa_porcentaje,
+        FLOOR(o.total * (o.multa_porcentaje / 100.0))::INT AS multa_monto,
+        (o.total + FLOOR(o.total * (o.multa_porcentaje / 100.0)) - COALESCE(o.senia,0))::INT AS total_a_pagar,
+        CASE
+          WHEN o.fecha_lista IS NOT NULL
+          THEN EXTRACT(DAY FROM NOW() - o.fecha_lista)::INT
+          ELSE 0
+        END AS dias_lista
       FROM ordenes o
       JOIN clientes c ON c.id = o.cliente_id
       WHERE o.estado = 'lista'
