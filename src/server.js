@@ -7,6 +7,7 @@ const path = require("path");
 const cron = require("node-cron");
 const pool = require("./db");
 const generarTicketPDF = require("./utils/generarTicketPDF");
+const { iniciarCronMultas } = require("./helpers/cronMultas");
 
 const app = express();
 
@@ -146,6 +147,13 @@ cron.schedule("0 19 28-31 * *", async () => {
     console.error("❌ Error generando resumen mensual:", err.message);
   }
 }, { timezone: "America/Argentina/Buenos_Aires" });
+
+// 📅 CRON DE MULTAS: revisa todos los días a las 9:00 hs (Argentina)
+//   - 30 días → multa 10% + WhatsApp
+//   - 45 días → multa 20% + WhatsApp
+//   - 60 días → último aviso por WhatsApp
+//   - 90 días → orden descartada + WhatsApp final
+iniciarCronMultas();
 
 // ========================
 // MIDDLEWARES

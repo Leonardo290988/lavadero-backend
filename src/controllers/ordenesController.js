@@ -701,6 +701,7 @@ const retirarOrden = async (req, res) => {
        o.fecha_ingreso,
        o.fecha_lista,
        o.estado,
+       o.multa_porcentaje,
        c.nombre AS cliente
 FROM ordenes o
 JOIN clientes c ON c.id = o.cliente_id
@@ -723,16 +724,22 @@ WHERE o.id=$1
     const total = Number(ord.rows[0].total);
     const senia = Number(ord.rows[0].senia) || 0;
 
-    // Calcular multa si pasaron más de 30 días desde que la orden quedó lista
-    let multa = 0;
-    if (ord.rows[0].fecha_lista) {
+    // 🆕 Usar multa ya aplicada por el cron (si existe), o calcular si por algún
+    // motivo no se ejecutó (fallback de seguridad)
+    let multaPorcentaje = Number(ord.rows[0].multa_porcentaje) || 0;
+
+    if (ord.rows[0].fecha_lista && multaPorcentaje === 0) {
       const diasLista = Math.floor(
         (new Date() - new Date(ord.rows[0].fecha_lista)) / (1000 * 60 * 60 * 24)
       );
-      if (diasLista > 30) {
-        multa = Math.floor(total * 0.10);
-        console.log(`⚠️ Multa por almacenamiento: ${diasLista} días → $${multa}`);
-      }
+      // Fallback: si el cron no la aplicó, calcular acá
+      if (diasLista >= 45) multaPorcentaje = 20;
+      else if (diasLista >= 30) multaPorcentaje = 10;
+    }
+
+    const multa = Math.floor(total * (multaPorcentaje / 100));
+    if (multa > 0) {
+      console.log(`⚠️ Multa ${multaPorcentaje}% por almacenamiento → $${multa}`);
     }
 
     const restante = total + multa - senia;
@@ -1494,7 +1501,9 @@ const getOrdenesSinRetirar = async (req, res) => {
         c.telefono,
         o.total,
         o.senia,
-        (o.total - COALESCE(o.senia, 0)) AS saldo,
+        o.multa_porcentaje,
+        FLOOR(o.total * (o.multa_porcentaje / 100.0))::INT AS multa_monto,
+        (o.total + FLOOR(o.total * (o.multa_porcentaje / 100.0)) - COALESCE(o.senia, 0))::INT AS saldo,
         o.fecha_lista,
         rr.ultimo_recordatorio,
         EXTRACT(DAY FROM NOW() - o.fecha_lista)::INTEGER AS dias_lista

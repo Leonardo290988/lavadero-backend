@@ -53,4 +53,16 @@ router.post("/:id/reimprimir-orden", reimprimirTicketOrden);
 router.post("/:id/reimprimir-retiro", reimprimirTicketRetiro);
 router.delete("/:id", eliminarOrden);
 router.post("/:ordenId/recordatorio", registrarRecordatorio);
+
+// 🆕 Endpoint para disparar manualmente la revisión de multas (testing)
+const { ejecutarRevisionMultas } = require("../helpers/cronMultas");
+router.post("/multas/ejecutar-ahora", async (req, res) => {
+  try {
+    await ejecutarRevisionMultas();
+    res.json({ ok: true, mensaje: "Revisión de multas ejecutada. Ver logs del servidor." });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
