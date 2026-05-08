@@ -10,6 +10,7 @@ const {
   getClientesInactivos,
   marcarContactado,
   guardarPushToken,
+  borrarPushToken,
   actualizarCliente
 } = require('../controllers/clientesController');
 
@@ -21,6 +22,9 @@ router.post("/login", loginCliente);
 
 // 🔔 Push token de la app del cliente
 router.post('/push-token', guardarPushToken);
+
+// 🔕 Borrar push token (logout)
+router.post('/push-token/logout', borrarPushToken);
 
 // 🆕 Actualizar datos del cliente desde la app
 router.put('/:id', actualizarCliente);

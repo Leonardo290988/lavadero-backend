@@ -223,6 +223,15 @@ const guardarPushToken = async (req, res) => {
   }
 
   try {
+    // 🆕 Si este push_token ya estaba asociado a OTRO cliente, lo desvinculamos
+    // (caso típico: alguien se logueó con varios clientes desde el mismo celular)
+    await pool.query(
+      `UPDATE clientes SET push_token = NULL
+       WHERE push_token = $1 AND id <> $2`,
+      [push_token, cliente_id]
+    );
+
+    // Asociar al cliente actual
     await pool.query(
       `UPDATE clientes SET push_token = $1 WHERE id = $2`,
       [push_token, cliente_id]
@@ -233,6 +242,43 @@ const guardarPushToken = async (req, res) => {
   } catch (error) {
     console.error("ERROR guardarPushToken:", error);
     res.status(500).json({ error: "Error guardando push token" });
+  }
+};
+
+// ======================================
+// 🆕 BORRAR PUSH TOKEN (LOGOUT)
+// La app llama a este endpoint cuando el cliente cierra sesión
+// para que NO le sigan llegando notificaciones de ese cliente
+// ======================================
+const borrarPushToken = async (req, res) => {
+  const { cliente_id, push_token } = req.body;
+
+  if (!cliente_id) {
+    return res.status(400).json({ error: "Falta cliente_id" });
+  }
+
+  try {
+    // Si nos pasaron el token específico, solo lo borramos si coincide
+    // (evita borrar el token si después de cerrar sesión otro cliente lo está usando)
+    if (push_token) {
+      await pool.query(
+        `UPDATE clientes SET push_token = NULL
+         WHERE id = $1 AND push_token = $2`,
+        [cliente_id, push_token]
+      );
+    } else {
+      // Sin token específico: borrar el push_token del cliente
+      await pool.query(
+        `UPDATE clientes SET push_token = NULL WHERE id = $1`,
+        [cliente_id]
+      );
+    }
+
+    console.log(`🔕 Push token borrado para cliente ${cliente_id}`);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("ERROR borrarPushToken:", error);
+    res.status(500).json({ error: "Error borrando push token" });
   }
 };
 
@@ -299,5 +345,6 @@ module.exports = {
   getClientesInactivos,
   marcarContactado,
   guardarPushToken,
+  borrarPushToken,
   actualizarCliente
 };
