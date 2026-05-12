@@ -43,8 +43,24 @@ const createCliente = async (req, res) => {
       }
     }
 
-    // 📍 Geocodificar dirección
-    const { lat, lng } = await geocodeDireccion(direccion);
+    // 📍 Geocodificar dirección (con tolerancia a errores)
+    // En el panel del local registramos el cliente igual aunque la dirección
+    // no se pueda geocodificar. Después si quiere pedir retiro desde la app
+    // se le pedirá actualizar la dirección.
+    let lat = null;
+    let lng = null;
+    if (direccion && direccion.trim()) {
+      try {
+        const coords = await geocodeDireccion(direccion);
+        lat = coords.lat;
+        lng = coords.lng;
+      } catch (geoError) {
+        console.warn(
+          `⚠️ Cliente "${nombre}" registrado SIN coordenadas. Dirección no geocodificada: "${direccion}". Error: ${geoError.message}`
+        );
+        // Continuamos: el cliente se registra sin lat/lng
+      }
+    }
 
     // 💾 Guardar cliente
     const result = await pool.query(
