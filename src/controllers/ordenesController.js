@@ -580,14 +580,35 @@ const getOrdenesListasParaRetiro = async (req, res) => {
         o.fecha_lista,
         o.total,
         o.senia,
-        o.multa_porcentaje,
-        FLOOR(o.total * (o.multa_porcentaje / 100.0))::INT AS multa_monto,
-        (o.total + FLOOR(o.total * (o.multa_porcentaje / 100.0)) - COALESCE(o.senia,0))::INT AS total_a_pagar,
+        -- 🆕 Calcular días "lista" al vuelo
         CASE
           WHEN o.fecha_lista IS NOT NULL
           THEN EXTRACT(DAY FROM NOW() - o.fecha_lista)::INT
           ELSE 0
-        END AS dias_lista
+        END AS dias_lista,
+        -- 🆕 Calcular porcentaje al vuelo (no depende del cron)
+        CASE
+          WHEN o.fecha_lista IS NULL THEN 0
+          WHEN EXTRACT(DAY FROM NOW() - o.fecha_lista) >= 45 THEN 20
+          WHEN EXTRACT(DAY FROM NOW() - o.fecha_lista) >= 30 THEN 10
+          ELSE 0
+        END AS multa_porcentaje,
+        -- 🆕 Monto de multa basado en el cálculo dinámico
+        CASE
+          WHEN o.fecha_lista IS NULL THEN 0
+          WHEN EXTRACT(DAY FROM NOW() - o.fecha_lista) >= 45 THEN FLOOR(o.total * 0.20)::INT
+          WHEN EXTRACT(DAY FROM NOW() - o.fecha_lista) >= 30 THEN FLOOR(o.total * 0.10)::INT
+          ELSE 0
+        END AS multa_monto,
+        -- 🆕 Total a pagar con multa dinámica
+        CASE
+          WHEN o.fecha_lista IS NULL THEN (o.total - COALESCE(o.senia, 0))::INT
+          WHEN EXTRACT(DAY FROM NOW() - o.fecha_lista) >= 45
+            THEN (o.total + FLOOR(o.total * 0.20) - COALESCE(o.senia, 0))::INT
+          WHEN EXTRACT(DAY FROM NOW() - o.fecha_lista) >= 30
+            THEN (o.total + FLOOR(o.total * 0.10) - COALESCE(o.senia, 0))::INT
+          ELSE (o.total - COALESCE(o.senia, 0))::INT
+        END AS total_a_pagar
       FROM ordenes o
       JOIN clientes c ON c.id = o.cliente_id
       WHERE o.estado = 'lista'
@@ -731,15 +752,13 @@ WHERE o.id=$1
     const total = Number(ord.rows[0].total);
     const senia = Number(ord.rows[0].senia) || 0;
 
-    // 🆕 Usar multa ya aplicada por el cron (si existe), o calcular si por algún
-    // motivo no se ejecutó (fallback de seguridad)
-    let multaPorcentaje = Number(ord.rows[0].multa_porcentaje) || 0;
-
-    if (ord.rows[0].fecha_lista && multaPorcentaje === 0) {
+    // 🆕 Calcular multa SIEMPRE al vuelo según los días lista
+    // No depende del cron, así garantizamos cobro correcto en todo momento
+    let multaPorcentaje = 0;
+    if (ord.rows[0].fecha_lista) {
       const diasLista = Math.floor(
         (new Date() - new Date(ord.rows[0].fecha_lista)) / (1000 * 60 * 60 * 24)
       );
-      // Fallback: si el cron no la aplicó, calcular acá
       if (diasLista >= 45) multaPorcentaje = 20;
       else if (diasLista >= 30) multaPorcentaje = 10;
     }
@@ -1508,9 +1527,26 @@ const getOrdenesSinRetirar = async (req, res) => {
         c.telefono,
         o.total,
         o.senia,
-        o.multa_porcentaje,
-        FLOOR(o.total * (o.multa_porcentaje / 100.0))::INT AS multa_monto,
-        (o.total + FLOOR(o.total * (o.multa_porcentaje / 100.0)) - COALESCE(o.senia, 0))::INT AS saldo,
+        -- 🆕 Calcular porcentaje al vuelo (no depende del cron)
+        CASE
+          WHEN EXTRACT(DAY FROM NOW() - o.fecha_lista) >= 45 THEN 20
+          WHEN EXTRACT(DAY FROM NOW() - o.fecha_lista) >= 30 THEN 10
+          ELSE 0
+        END AS multa_porcentaje,
+        -- 🆕 Monto de multa basado en cálculo dinámico
+        CASE
+          WHEN EXTRACT(DAY FROM NOW() - o.fecha_lista) >= 45 THEN FLOOR(o.total * 0.20)::INT
+          WHEN EXTRACT(DAY FROM NOW() - o.fecha_lista) >= 30 THEN FLOOR(o.total * 0.10)::INT
+          ELSE 0
+        END AS multa_monto,
+        -- 🆕 Saldo con multa dinámica
+        CASE
+          WHEN EXTRACT(DAY FROM NOW() - o.fecha_lista) >= 45
+            THEN (o.total + FLOOR(o.total * 0.20) - COALESCE(o.senia, 0))::INT
+          WHEN EXTRACT(DAY FROM NOW() - o.fecha_lista) >= 30
+            THEN (o.total + FLOOR(o.total * 0.10) - COALESCE(o.senia, 0))::INT
+          ELSE (o.total - COALESCE(o.senia, 0))::INT
+        END AS saldo,
         o.fecha_lista,
         rr.ultimo_recordatorio,
         EXTRACT(DAY FROM NOW() - o.fecha_lista)::INTEGER AS dias_lista
