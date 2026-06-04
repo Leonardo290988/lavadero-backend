@@ -1059,11 +1059,14 @@ const getOrdenesRetiradas = async (req, res) => {
         c.nombre AS cliente,
         c.telefono,
         o.total,
+        TO_CHAR(o.fecha_ingreso, 'YYYY-MM-DD HH24:MI:SS') AS fecha_ingreso,
         TO_CHAR(o.fecha_retiro, 'YYYY-MM-DD HH24:MI:SS') AS fecha_retiro,
-        u.nombre AS usuario
+        u.nombre AS usuario,
+        ug.nombre AS usuario_genero
         FROM ordenes o
 JOIN clientes c ON o.cliente_id = c.id
 LEFT JOIN usuarios u ON u.id = o.usuario_retiro_id
+LEFT JOIN usuarios ug ON ug.id = o.usuario_id
 WHERE o.estado = 'retirada'
     `;
 
