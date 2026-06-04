@@ -76,8 +76,8 @@ const getOrdenes = async (req, res) => {
         o.cliente_id,
         c.nombre AS cliente,
         o.estado,
-        o.fecha_ingreso,
-        o.fecha_retiro,
+        TO_CHAR(o.fecha_ingreso, 'YYYY-MM-DD HH24:MI:SS') AS fecha_ingreso,
+        TO_CHAR(o.fecha_retiro, 'YYYY-MM-DD HH24:MI:SS') AS fecha_retiro,
         o.senia,
         o.total
       FROM ordenes o
