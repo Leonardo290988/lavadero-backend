@@ -196,6 +196,7 @@ app.use("/estadisticas", require("./routes/estadisticas"));
 app.use("/contabilidad", require("./routes/contabilidad"));
 app.use("/club", require("./routes/club"));
 app.use("/whatsapp", require("./routes/whatsapp"));
+app.use("/operador", require("./routes/operador"));
 
 // ========================
 // SERVER

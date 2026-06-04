@@ -78,4 +78,26 @@ pool.query(`
   )
 `).catch(err => console.error('❌ Error creando historial_precios:', err));
 
+// Crear tabla notificaciones_operador si no existe
+// Guarda los pedidos de "operador" que hacen los clientes en el bot de WhatsApp
+// para que los empleados los vean en el panel (campana de notificaciones)
+pool.query(`
+  CREATE TABLE IF NOT EXISTS notificaciones_operador (
+    id SERIAL PRIMARY KEY,
+    chat_id VARCHAR(80) NOT NULL,
+    telefono VARCHAR(40),
+    nombre_cliente VARCHAR(120),
+    mensaje_cliente TEXT,
+    atendido BOOLEAN DEFAULT false,
+    fecha_pedido TIMESTAMP DEFAULT NOW(),
+    fecha_atendido TIMESTAMP
+  )
+`).catch(err => console.error('❌ Error creando notificaciones_operador:', err));
+
+// Índice para acelerar la consulta de pendientes
+pool.query(`
+  CREATE INDEX IF NOT EXISTS idx_notif_operador_pendientes
+  ON notificaciones_operador (atendido, fecha_pedido DESC)
+`).catch(err => console.error('❌ Error creando índice notif_operador:', err));
+
 module.exports = pool;

@@ -4,7 +4,7 @@ const PDFDocument = require("pdfkit");
 
 const carpeta = path.join(__dirname, "../pdf/ordenes");
 
-function generarTicketRopa({ id, cliente }) {
+function generarTicketRopa({ id, cliente, notas }) {
   return new Promise((resolve, reject) => {
 
     if (!fs.existsSync(carpeta)) {
@@ -14,7 +14,10 @@ function generarTicketRopa({ id, cliente }) {
     const archivo = path.join(carpeta, `ropa_${id}.pdf`);
 
     // Ticket pequeño — mismo ancho que los otros
-    const doc = new PDFDocument({ size: [226, 160], margin: 10 });
+    // La altura se ajusta según si hay nota o no
+    const tieneNota = notas && notas.trim().length > 0;
+    const alto = tieneNota ? 240 : 160;
+    const doc = new PDFDocument({ size: [226, alto], margin: 10 });
 
     const stream = fs.createWriteStream(archivo);
     doc.pipe(stream);
@@ -28,6 +31,16 @@ function generarTicketRopa({ id, cliente }) {
 
     doc.moveDown(0.3);
     doc.fontSize(14).text(cliente, { align: "center" });
+
+    // ---- Nota de la orden (si existe) ----
+    if (tieneNota) {
+      doc.moveDown(0.5);
+      doc.moveTo(10, doc.y).lineTo(216, doc.y).stroke();
+      doc.moveDown(0.4);
+      doc.fontSize(11).font("Helvetica-Bold").text("NOTA:", { align: "center" });
+      doc.font("Helvetica");
+      doc.fontSize(11).text(notas.trim(), { align: "center", width: 206 });
+    }
 
     stream.on("finish", () => resolve(archivo));
     stream.on("error", reject);

@@ -1203,10 +1203,11 @@ await generarTicketOrden({
   tiene_envio: orden.tiene_envio
 });
 
-    // Generar ticket de ropa (solo número de orden y nombre)
+    // Generar ticket de ropa (solo número de orden y nombre + nota si tiene)
     await generarTicketRopa({
       id: orden.id,
-      cliente: orden.cliente
+      cliente: orden.cliente,
+      notas: orden.notas
     });
 
     console.log("✅ TICKETS GENERADOS");
@@ -1326,7 +1327,7 @@ const reimprimirTicketOrden = async (req, res) => {
   try {
     // Traer datos de la orden
     const ordenRes = await pool.query(`
-      SELECT o.id, o.senia, o.total, o.tiene_envio, o.fecha_ingreso,
+      SELECT o.id, o.senia, o.total, o.tiene_envio, o.fecha_ingreso, o.notas,
              c.nombre AS cliente, c.telefono
       FROM ordenes o
       JOIN clientes c ON c.id = o.cliente_id
@@ -1382,7 +1383,8 @@ const reimprimirTicketOrden = async (req, res) => {
 
     await generarTicketRopa({
       id: orden.id,
-      cliente: orden.cliente
+      cliente: orden.cliente,
+      notas: orden.notas
     });
 
     res.json({ ok: true, pdf: `/pdf/ordenes/orden_${id}.pdf` });
