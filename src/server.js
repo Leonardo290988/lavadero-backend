@@ -175,6 +175,8 @@ app.use(express.json());
 // ========================
 app.use("/pdf", express.static(path.join(__dirname, "pdf")));
 app.use("/caja/pdf", express.static(path.join(__dirname, "pdf")));
+// Placas generadas para redes sociales (Facebook / Instagram)
+app.use("/generated", express.static(path.join(__dirname, "public", "generated")));
 
 // ========================
 // RUTAS
@@ -197,6 +199,46 @@ app.use("/contabilidad", require("./routes/contabilidad"));
 app.use("/club", require("./routes/club"));
 app.use("/whatsapp", require("./routes/whatsapp"));
 app.use("/operador", require("./routes/operador"));
+
+// ========================
+// ⚠️ RUTA TEMPORAL DE PRUEBA — BORRAR DESPUÉS DE TESTEAR
+// ========================
+app.get("/test-publicar", async (req, res) => {
+  try {
+    const { generarPlaca } = require("./services/imageGenerator");
+    const { publishFacebook, publishInstagram } = require("./services/metaPublisher");
+
+    const placa = await generarPlaca({
+      etiqueta: "PROMO",
+      titular: "3x2 en acolchados",
+      bajada: "Llevás 3 y pagás 2 · De martes a viernes",
+    });
+
+    const texto =
+      "¡Aprovechá nuestra promo 3x2 en acolchados! 🛏️\n" +
+      "Traé 3 y pagás solo 2, de martes a viernes.\n" +
+      "Te esperamos en Lavaderos Moreno.";
+    const hashtags = ["#LavaderosMoreno", "#Moreno", "#Lavandería"];
+
+    const resultado = { placa: placa.publicUrl };
+
+    try {
+      resultado.facebook = await publishFacebook(placa.publicUrl, texto, hashtags);
+    } catch (e) {
+      resultado.facebook_error = e.message;
+    }
+
+    try {
+      resultado.instagram = await publishInstagram(placa.publicUrl, texto, hashtags);
+    } catch (e) {
+      resultado.instagram_error = e.message;
+    }
+
+    res.json(resultado);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // ========================
 // SERVER
