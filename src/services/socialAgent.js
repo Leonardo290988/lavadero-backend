@@ -14,6 +14,7 @@
 
 const axios = require("axios");
 const pool = require("../db");
+const { getFechasRelevantes } = require("./calendarioFechas");
 
 // ============================================================
 //  PROMOS FIJAS — editá acá cuando cambien tus promociones
@@ -82,6 +83,7 @@ async function getContext() {
     hora: now.getHours(),
     fecha: now.toISOString().slice(0, 10),
     ultimas,
+    fechasRelevantes: getFechasRelevantes(now, 2),
   };
 }
 
@@ -116,6 +118,14 @@ REGLAS DE DECISIÓN:
 - Si en el contexto no hay nada interesante para decir o ya publicaste algo muy parecido hace muy poco, respondé shouldPost: false.
 - Estamos en invierno en Argentina (junio-agosto): aprovechá el frío, los acolchados, camperones, la lluvia.
 
+FECHAS ESPECIALES (¡muy importante!):
+- Si en el contexto aparece una FECHA RELEVANTE (fecha patria, comercial, estación o partido del Mundial) que es hoy o está muy cerca, dale PRIORIDAD y armá el contenido alusivo a esa fecha.
+- Patrias: tono respetuoso y festivo, sin chabacanería ni uso comercial agresivo. Un saludo cálido del negocio.
+- Comerciales (Día del Padre/Madre/Niño, San Valentín, Amigo): podés ligarlas a una promo o a "regalá tiempo libre, nosotros lavamos".
+- Estaciones (invierno): perfecto para empujar acolchados y camperones.
+- MUNDIAL: cuando Argentina juega (hoy o en 1-2 días), hacé un posteo alentando a la Selección con identidad de marca (ej: relacionar la camiseta argentina, el aguante, con que vos te ocupás de la ropa mientras ellos alientan). Tono festivo, "¡Vamos Argentina!". Nunca uses escudos, logos de FIFA ni marcas registradas; solo aliento genérico.
+- Si hay varias fechas cerca, elegí la más relevante para el negocio y no las amontones.
+
 REDACCIÓN:
 - El texto del post (caption) tiene que sonar humano y cercano, nunca robótico ni corporativo. Máximo 4 líneas. Podés usar 1-2 emojis con moderación.
 - Hashtags: máximo 3, relevantes y locales (ej: #LavaderosMoreno #Moreno).
@@ -143,6 +153,9 @@ CONTEXTO DE HOY:
 
 ÚLTIMAS PUBLICACIONES (de más nueva a más vieja):
 ${ctx.ultimas.length ? ctx.ultimas.map(u => `- [${u.modo}] ${u.titular || u.caption?.slice(0, 60) || ""} (${new Date(u.publicado_en).toISOString().slice(0, 10)})`).join("\n") : "Todavía no hay publicaciones registradas."}
+
+FECHAS RELEVANTES HOY O PRÓXIMAS:
+${ctx.fechasRelevantes.length ? ctx.fechasRelevantes.map(f => `- ${f.nombre}${f.detalle ? " (" + f.detalle + ")" : ""} → ${f.esHoy ? "ES HOY" : "en " + f.faltan + " día(s)"} [${f.tipo}]`).join("\n") : "No hay fechas especiales cerca."}
 
 Decidí si publicar hoy y, si sí, generá el contenido completo.
 `;
