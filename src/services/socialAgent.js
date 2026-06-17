@@ -112,10 +112,12 @@ Preferí estos términos base (son seguros y apropiados): ${BUSQUEDAS_BASE.join(
 Podés variar con términos parecidos y apropiados si encajan mejor con la frase, pero mantené siempre relación con: ropa, lavandería, hogar, familia, invierno/frío, ropa de cama. NUNCA uses términos que puedan traer imágenes inapropiadas, de personas en situaciones privadas, marcas, ni nada fuera del rubro.
 
 REGLAS DE DECISIÓN:
-- Martes a viernes: priorizá la promo 3x2 (son días para empujar acolchados/camperones), pero no la repitas si ya salió hace poco.
-- Lunes / fin de semana: mejor una "frase" emocional o el sistema de puntos.
-- Mirá las ÚLTIMAS PUBLICACIONES y NO repitas el mismo tema ni el mismo estilo que las últimas 2-3. Buscá variar.
-- Si en el contexto no hay nada interesante para decir o ya publicaste algo muy parecido hace muy poco, respondé shouldPost: false.
+- PREFERENCIA DE ESTILO: la mayoría de las publicaciones (alrededor de 7 de cada 10) deben ser estilo "frase" con foto real, porque enganchan más. Usá "placa" con menos frecuencia (alrededor de 3 de cada 10), reservándola para cuando hay una promo concreta para empujar (3x2 o puntos) o una fecha que pida un diseño de placa.
+- Mirá las ÚLTIMAS PUBLICACIONES: si las últimas fueron placas, esta vez hacé "frase"; si venís con varias "frase", podés meter una placa de promo. Buscá que predomine "frase" pero sin abandonar las promos.
+- Martes a viernes: buen momento para recordar la promo 3x2, pero podés hacerlo igual con estilo "frase" (foto + frase que mencione la promo) en vez de placa, para variar.
+- Lunes / fin de semana: "frase" emocional.
+- NO repitas el mismo tema ni el mismo estilo que las últimas 2-3. Buscá variar.
+- Si ya publicaste algo muy parecido hace muy poco, respondé shouldPost: false.
 - Estamos en invierno en Argentina (junio-agosto): aprovechá el frío, los acolchados, camperones, la lluvia.
 
 FECHAS ESPECIALES (¡muy importante!):
