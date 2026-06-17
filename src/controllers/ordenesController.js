@@ -6,6 +6,7 @@ const imprimirTicket = require("../utils/imprimirTicket");
 const generarTicketRopa = require("../utils/generarTicketRopa");
 const generarTicketRetiro = require("../utils/generarTicketRetiro");
 const { exec } = require("child_process");
+const { obtenerPrecioEnFecha } = require("../helpers/precioHistorico");
 
 // ======================================
 // HELPER: Verificar si la promo 3x2 aplica hoy (Martes a Viernes)
@@ -76,8 +77,8 @@ const getOrdenes = async (req, res) => {
         o.cliente_id,
         c.nombre AS cliente,
         o.estado,
-        TO_CHAR(o.fecha_ingreso, 'YYYY-MM-DD HH24:MI:SS') AS fecha_ingreso,
-        TO_CHAR(o.fecha_retiro, 'YYYY-MM-DD HH24:MI:SS') AS fecha_retiro,
+        o.fecha_ingreso,
+        o.fecha_retiro,
         o.senia,
         o.total
       FROM ordenes o
@@ -245,7 +246,28 @@ const agregarServicioAOrden = async (req, res) => {
       return res.status(404).json({ error: 'Servicio no existe' });
     }
 
-    const precio = servicio.rows[0].precio;
+    // Traemos la fecha de ingreso de la orden para resolver el precio
+    // que estaba vigente en ese momento (no el precio actual del servicio).
+    const ordenInfo = await pool.query(
+      'SELECT fecha_ingreso FROM ordenes WHERE id = $1',
+      [id]
+    );
+
+    if (ordenInfo.rows.length === 0) {
+      return res.status(404).json({ error: 'Orden no existe' });
+    }
+
+    const fechaIngreso = ordenInfo.rows[0].fecha_ingreso;
+
+    // Precio histórico vigente a la fecha de ingreso de la orden.
+    // Si la orden ingresó antes de un aumento, toma el precio viejo;
+    // si ingresó después, toma el precio nuevo.
+    let precio = await obtenerPrecioEnFecha(servicio_id, fechaIngreso);
+
+    // Resguardo: si por algún motivo no se pudo resolver, usamos el actual.
+    if (precio == null) {
+      precio = servicio.rows[0].precio;
+    }
 
     await pool.query(
       `
@@ -1059,14 +1081,11 @@ const getOrdenesRetiradas = async (req, res) => {
         c.nombre AS cliente,
         c.telefono,
         o.total,
-        TO_CHAR(o.fecha_ingreso, 'YYYY-MM-DD HH24:MI:SS') AS fecha_ingreso,
         TO_CHAR(o.fecha_retiro, 'YYYY-MM-DD HH24:MI:SS') AS fecha_retiro,
-        u.nombre AS usuario,
-        ug.nombre AS usuario_genero
+        u.nombre AS usuario
         FROM ordenes o
 JOIN clientes c ON o.cliente_id = c.id
 LEFT JOIN usuarios u ON u.id = o.usuario_retiro_id
-LEFT JOIN usuarios ug ON ug.id = o.usuario_id
 WHERE o.estado = 'retirada'
     `;
 
@@ -1206,11 +1225,10 @@ await generarTicketOrden({
   tiene_envio: orden.tiene_envio
 });
 
-    // Generar ticket de ropa (solo número de orden y nombre + nota si tiene)
+    // Generar ticket de ropa (solo número de orden y nombre)
     await generarTicketRopa({
       id: orden.id,
-      cliente: orden.cliente,
-      notas: orden.notas
+      cliente: orden.cliente
     });
 
     console.log("✅ TICKETS GENERADOS");
@@ -1330,7 +1348,7 @@ const reimprimirTicketOrden = async (req, res) => {
   try {
     // Traer datos de la orden
     const ordenRes = await pool.query(`
-      SELECT o.id, o.senia, o.total, o.tiene_envio, o.fecha_ingreso, o.notas,
+      SELECT o.id, o.senia, o.total, o.tiene_envio, o.fecha_ingreso,
              c.nombre AS cliente, c.telefono
       FROM ordenes o
       JOIN clientes c ON c.id = o.cliente_id
@@ -1386,8 +1404,7 @@ const reimprimirTicketOrden = async (req, res) => {
 
     await generarTicketRopa({
       id: orden.id,
-      cliente: orden.cliente,
-      notas: orden.notas
+      cliente: orden.cliente
     });
 
     res.json({ ok: true, pdf: `/pdf/ordenes/orden_${id}.pdf` });
