@@ -41,6 +41,21 @@ Lavaderos Moreno es una lavandería en Moreno, GBA Oeste, Argentina.
 - Público: familias y trabajadores de la zona, gente con poco tiempo.
 `;
 
+// Lista base de búsquedas de imágenes SEGURAS (en inglés, para Pexels).
+// Claude debe preferir estas, pero puede variar con términos parecidos y apropiados.
+const BUSQUEDAS_BASE = [
+  "folded laundry",
+  "clean clothes basket",
+  "cozy home winter",
+  "laundry basket clothes",
+  "fresh towels",
+  "rainy window home",
+  "warm blanket bed",
+  "happy family home",
+  "washing machine home",
+  "neatly folded clothes",
+];
+
 /**
  * Trae el contexto actual desde la base.
  */
@@ -87,7 +102,12 @@ ${PROMOS_FIJAS.map(p => `- [${p.id}] ${p.descripcion}`).join("\n")}
 
 TENÉS DOS ESTILOS DE PUBLICACIÓN:
 1. "placa"  → una placa de promoción con diseño de marca (etiqueta tipo PROMO, un titular corto y potente, y una bajada). Ideal para comunicar promociones concretas (3x2, puntos).
-2. "frase"  → una imagen estilo foto + frase emocional/cercana, que conecta con la vida cotidiana (el cansancio, el tiempo libre, el frío, el valor de la ropa). Ideal para novedades, estacionalidad y enganche emocional. NO es una promo directa.
+2. "frase"  → una imagen estilo foto + frase emocional/cercana, que conecta con la vida cotidiana (el cansancio, el tiempo libre, el frío, el valor de la ropa). Ideal para novedades, estacionalidad y enganche emocional. NO es una promo directa. Para este estilo se baja una foto real de fondo.
+
+BÚSQUEDA DE FOTO (solo para modo "frase"):
+Si el modo es "frase", incluí en el JSON el campo "busqueda" con términos EN INGLÉS para buscar la foto de fondo.
+Preferí estos términos base (son seguros y apropiados): ${BUSQUEDAS_BASE.join(", ")}.
+Podés variar con términos parecidos y apropiados si encajan mejor con la frase, pero mantené siempre relación con: ropa, lavandería, hogar, familia, invierno/frío, ropa de cama. NUNCA uses términos que puedan traer imágenes inapropiadas, de personas en situaciones privadas, marcas, ni nada fuera del rubro.
 
 REGLAS DE DECISIÓN:
 - Martes a viernes: priorizá la promo 3x2 (son días para empujar acolchados/camperones), pero no la repitas si ya salió hace poco.
@@ -108,7 +128,7 @@ RESPONDÉ ÚNICAMENTE CON JSON VÁLIDO, sin markdown, sin explicaciones, con est
   "razon": "breve por qué de la decisión",
   "modo": "placa" | "frase",
   "placa": { "etiqueta": "PROMO", "titular": "...", "bajada": "..." },
-  "frase": { "frase": "...", "bajada": "..." },
+  "frase": { "frase": "...", "bajada": "...", "busqueda": "folded laundry" },
   "caption": "texto del post para FB e IG",
   "hashtags": ["#...", "#..."]
 }

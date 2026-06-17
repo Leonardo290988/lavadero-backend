@@ -21,6 +21,7 @@
 const { createCanvas, GlobalFonts, loadImage } = require('@napi-rs/canvas');
 const fs = require('fs');
 const path = require('path');
+const axios = require('axios');
 
 // ---- Paleta de marca (azul / rojo / oscuro) ----
 const COLORS = {
@@ -225,35 +226,63 @@ function elegirFondoAzar() {
 }
 
 /**
+ * Baja una foto de Pexels según una búsqueda (en inglés funciona mejor).
+ * Devuelve un Image listo para dibujar, o null si falla / no hay key.
+ */
+async function obtenerFotoPexels(query) {
+  if (!query || !process.env.PEXELS_API_KEY) return null;
+  try {
+    const res = await axios.get("https://api.pexels.com/v1/search", {
+      headers: { Authorization: process.env.PEXELS_API_KEY },
+      params: { query, per_page: 15, orientation: "square" },
+      timeout: 15000,
+    });
+    const fotos = res.data?.photos || [];
+    if (fotos.length === 0) return null;
+
+    // Elegir una al azar entre las primeras 10 para variar
+    const candidatas = fotos.slice(0, 10);
+    const elegida = candidatas[Math.floor(Math.random() * candidatas.length)];
+    const url = elegida.src.large2x || elegida.src.large || elegida.src.original;
+
+    // Descargar los bytes y cargarlos como imagen (sin guardar a disco)
+    const img = await axios.get(url, { responseType: "arraybuffer", timeout: 20000 });
+    return await loadImage(Buffer.from(img.data));
+  } catch (e) {
+    console.warn("[imageGenerator] Pexels falló:", e.message);
+    return null;
+  }
+}
+
+/**
  * Genera una imagen estilo "foto + frase emocional".
- * Si hay fotos en assets/backgrounds/ usa una al azar; si no, usa
- * un fondo de marca con degradado (igual queda prolijo).
+ * Prioridad del fondo: Pexels (si hay query y key) → assets/backgrounds/ → fondo de marca.
  *
  * @param {Object} opts
- * @param {string} opts.frase   - Frase principal (ej: "Llegás cansado... y todavía te espera la ropa")
- * @param {string} [opts.bajada]- Texto secundario (ej: "Nosotros nos encargamos por vos")
+ * @param {string} opts.frase    - Frase principal
+ * @param {string} [opts.bajada] - Texto secundario
+ * @param {string} [opts.busqueda] - Términos en inglés para buscar la foto en Pexels
  * @returns {Promise<{filePath, publicUrl, fileName}>}
  */
-async function generarFotoFrase({ frase, bajada = '' }) {
+async function generarFotoFrase({ frase, bajada = '', busqueda = '' }) {
   const canvas = createCanvas(SIZE, SIZE);
   const ctx = canvas.getContext('2d');
 
-  // ---- Fondo: foto al azar o degradado de marca ----
-  const fondoPath = elegirFondoAzar();
-  if (fondoPath) {
-    try {
-      const img = await loadImage(fondoPath);
-      // "cover": escalar para llenar 1080x1080 y centrar
-      const escala = Math.max(SIZE / img.width, SIZE / img.height);
-      const w = img.width * escala;
-      const h = img.height * escala;
-      ctx.drawImage(img, (SIZE - w) / 2, (SIZE - h) / 2, w, h);
-    } catch {
-      // si falla, degradado
-      const g = ctx.createLinearGradient(0, 0, 0, SIZE);
-      g.addColorStop(0, COLORS.bgTop); g.addColorStop(1, COLORS.bgBottom);
-      ctx.fillStyle = g; ctx.fillRect(0, 0, SIZE, SIZE);
+  // ---- Fondo: Pexels → carpeta local → degradado de marca ----
+  let fondoImg = await obtenerFotoPexels(busqueda);
+  if (!fondoImg) {
+    const fondoPath = elegirFondoAzar();
+    if (fondoPath) {
+      try { fondoImg = await loadImage(fondoPath); } catch { fondoImg = null; }
     }
+  }
+
+  if (fondoImg) {
+    // "cover": escalar para llenar 1080x1080 y centrar
+    const escala = Math.max(SIZE / fondoImg.width, SIZE / fondoImg.height);
+    const w = fondoImg.width * escala;
+    const h = fondoImg.height * escala;
+    ctx.drawImage(fondoImg, (SIZE - w) / 2, (SIZE - h) / 2, w, h);
   } else {
     const g = ctx.createLinearGradient(0, 0, 0, SIZE);
     g.addColorStop(0, COLORS.bgTop); g.addColorStop(1, COLORS.bgBottom);

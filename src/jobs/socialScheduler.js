@@ -70,6 +70,7 @@ async function ejecutarCiclo() {
     imagen = await generarFotoFrase({
       frase: decision.frase.frase,
       bajada: decision.frase.bajada,
+      busqueda: decision.frase.busqueda,
     });
     titular = decision.frase.frase;
   } else {
