@@ -137,6 +137,7 @@ async function generarPlaca({ titular, bajada = '', etiqueta = '' }) {
       ctx.fillRect(x, y, w, h);
     }
     ctx.fillStyle = COLORS.white;
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(txt, SIZE / 2, y + h / 2 + 2);
     ctx.textBaseline = 'alphabetic';
@@ -205,6 +206,128 @@ async function generarPlaca({ titular, bajada = '', etiqueta = '' }) {
   return { filePath, publicUrl, fileName };
 }
 
+// Carpeta de fotos de fondo para el estilo "foto + frase" (opcional)
+const BG_DIR = path.join(__dirname, '..', 'assets', 'backgrounds');
+
+/**
+ * Elige una foto de fondo al azar de assets/backgrounds/.
+ * Devuelve null si no hay ninguna (entonces se usa fondo de marca).
+ */
+function elegirFondoAzar() {
+  try {
+    if (!fs.existsSync(BG_DIR)) return null;
+    const fotos = fs.readdirSync(BG_DIR).filter(f => /\.(jpg|jpeg|png)$/i.test(f));
+    if (fotos.length === 0) return null;
+    return path.join(BG_DIR, fotos[Math.floor(Math.random() * fotos.length)]);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Genera una imagen estilo "foto + frase emocional".
+ * Si hay fotos en assets/backgrounds/ usa una al azar; si no, usa
+ * un fondo de marca con degradado (igual queda prolijo).
+ *
+ * @param {Object} opts
+ * @param {string} opts.frase   - Frase principal (ej: "Llegás cansado... y todavía te espera la ropa")
+ * @param {string} [opts.bajada]- Texto secundario (ej: "Nosotros nos encargamos por vos")
+ * @returns {Promise<{filePath, publicUrl, fileName}>}
+ */
+async function generarFotoFrase({ frase, bajada = '' }) {
+  const canvas = createCanvas(SIZE, SIZE);
+  const ctx = canvas.getContext('2d');
+
+  // ---- Fondo: foto al azar o degradado de marca ----
+  const fondoPath = elegirFondoAzar();
+  if (fondoPath) {
+    try {
+      const img = await loadImage(fondoPath);
+      // "cover": escalar para llenar 1080x1080 y centrar
+      const escala = Math.max(SIZE / img.width, SIZE / img.height);
+      const w = img.width * escala;
+      const h = img.height * escala;
+      ctx.drawImage(img, (SIZE - w) / 2, (SIZE - h) / 2, w, h);
+    } catch {
+      // si falla, degradado
+      const g = ctx.createLinearGradient(0, 0, 0, SIZE);
+      g.addColorStop(0, COLORS.bgTop); g.addColorStop(1, COLORS.bgBottom);
+      ctx.fillStyle = g; ctx.fillRect(0, 0, SIZE, SIZE);
+    }
+  } else {
+    const g = ctx.createLinearGradient(0, 0, 0, SIZE);
+    g.addColorStop(0, COLORS.bgTop); g.addColorStop(1, COLORS.bgBottom);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, SIZE, SIZE);
+  }
+
+  // ---- Scrim oscuro para que el texto se lea sobre cualquier foto ----
+  const scrim = ctx.createLinearGradient(0, 0, 0, SIZE);
+  scrim.addColorStop(0, 'rgba(10,18,30,0.78)');
+  scrim.addColorStop(0.45, 'rgba(10,18,30,0.45)');
+  scrim.addColorStop(1, 'rgba(10,18,30,0.85)');
+  ctx.fillStyle = scrim;
+  ctx.fillRect(0, 0, SIZE, SIZE);
+
+  // ---- Frase principal (arriba) ----
+  ctx.fillStyle = COLORS.white;
+  ctx.textAlign = 'left';
+  const maxWidth = SIZE - 140;
+  let fontSize = 82;
+  let lines = [];
+  while (fontSize >= 48) {
+    ctx.font = `${fontSize}px Montserrat-Bold`;
+    lines = wrapText(ctx, frase, maxWidth);
+    if (lines.length <= 5) break;
+    fontSize -= 5;
+  }
+  const lineHeight = fontSize * 1.15;
+  let y = 150;
+  // sombra suave para legibilidad
+  ctx.shadowColor = 'rgba(0,0,0,0.55)';
+  ctx.shadowBlur = 16;
+  for (const line of lines) {
+    ctx.fillText(line, 70, y);
+    y += lineHeight;
+  }
+  ctx.shadowBlur = 0;
+
+  // Acento rojo
+  ctx.fillStyle = COLORS.red;
+  ctx.fillRect(70, y + 6, 120, 9);
+  y += 70;
+
+  // ---- Bajada ----
+  if (bajada) {
+    ctx.fillStyle = '#E8EEF6';
+    ctx.font = '40px Montserrat-Reg';
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur = 12;
+    for (const line of wrapText(ctx, bajada, maxWidth)) {
+      ctx.fillText(line, 70, y);
+      y += 52;
+    }
+    ctx.shadowBlur = 0;
+  }
+
+  // ---- Logo abajo a la izquierda ----
+  const logoPath = path.join(__dirname, '..', 'assets', 'logo.png');
+  if (fs.existsSync(logoPath)) {
+    try {
+      const logo = await loadImage(logoPath);
+      const logoW = 230;
+      const logoH = (logo.height / logo.width) * logoW;
+      ctx.drawImage(logo, 70, SIZE - logoH - 60, logoW, logoH);
+    } catch { /* sin logo */ }
+  }
+
+  // ---- Guardar ----
+  const fileName = `frase-${Date.now()}.png`;
+  const filePath = path.join(OUTPUT_DIR, fileName);
+  fs.writeFileSync(filePath, await canvas.encode('png'));
+  const base = process.env.BASE_PUBLIC_URL || '';
+  return { filePath, publicUrl: `${base}/generated/${fileName}`, fileName };
+}
+
 /**
  * Borra placas viejas (más de 1 hora) para no acumular archivos.
  * Las imágenes solo necesitan vivir hasta que Meta las descarga.
@@ -222,4 +345,4 @@ function limpiarPlacasViejas() {
   }
 }
 
-module.exports = { generarPlaca, limpiarPlacasViejas };
+module.exports = { generarPlaca, generarFotoFrase, limpiarPlacasViejas };

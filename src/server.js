@@ -8,6 +8,7 @@ const cron = require("node-cron");
 const pool = require("./db");
 const generarTicketPDF = require("./utils/generarTicketPDF");
 const { iniciarCronMultas } = require("./helpers/cronMultas");
+const { initSocialScheduler } = require("./jobs/socialScheduler");
 
 const app = express();
 
@@ -155,6 +156,9 @@ cron.schedule("0 19 28-31 * *", async () => {
 //   - 90 días → orden descartada + WhatsApp final
 iniciarCronMultas();
 
+// 📣 AGENTE DE REDES SOCIALES: publica automáticamente a las 10:00 y 18:00 (Argentina)
+initSocialScheduler();
+
 // ========================
 // MIDDLEWARES
 // ========================
@@ -199,6 +203,20 @@ app.use("/contabilidad", require("./routes/contabilidad"));
 app.use("/club", require("./routes/club"));
 app.use("/whatsapp", require("./routes/whatsapp"));
 app.use("/operador", require("./routes/operador"));
+
+// ========================
+// ⚠️ RUTA TEMPORAL DE PRUEBA — BORRAR DESPUÉS DE TESTEAR
+//    Dispara el agente completo: decide, redacta, genera y publica.
+// ========================
+app.get("/test-agente", async (req, res) => {
+  try {
+    const { ejecutarCiclo } = require("./jobs/socialScheduler");
+    const resultado = await ejecutarCiclo();
+    res.json(resultado);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // ========================
 // SERVER
