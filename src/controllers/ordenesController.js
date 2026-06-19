@@ -216,18 +216,19 @@ const fechaRetiroFinal = fecha_retiro || null;
 // POST /ordenes/:id/servicios
 // ===============================
 // HELPER: Recalcular y guardar total de la orden
-// Se llama al agregar/eliminar servicios en orden confirmada
+// Se llama al agregar/eliminar servicios en orden confirmada o lista.
 // ===============================
 const recalcularTotalOrden = async (ordenId) => {
   const ordenRes = await pool.query(
-    `SELECT estado, senia FROM ordenes WHERE id = $1`, [ordenId]
+    `SELECT estado, senia, descuento_fidelidad FROM ordenes WHERE id = $1`, [ordenId]
   );
   if (ordenRes.rows.length === 0) return;
 
-  const { estado, senia } = ordenRes.rows[0];
+  const { estado, senia, descuento_fidelidad } = ordenRes.rows[0];
 
-  // Solo actualizar si la orden está confirmada (ya tiene total guardado)
-  if (estado !== 'confirmada') return;
+  // Solo recalculamos el total guardado para órdenes confirmadas o listas.
+  // En retirada/entregada el total ya es el monto cobrado: no se toca.
+  if (!['confirmada', 'lista'].includes(estado)) return;
 
   const itemsRes = await pool.query(`
     SELECT s.nombre AS descripcion, os.cantidad, os.precio_unitario AS precio
@@ -250,7 +251,21 @@ const recalcularTotalOrden = async (ordenId) => {
     fechaIngresoOrden
   );
 
-  let total = subtotal - promoDescuento - Number(senia || 0);
+  let total = subtotal - promoDescuento;
+
+  if (estado === 'confirmada') {
+    // Confirmada: el total guardado ya descuenta la seña.
+    total -= Number(senia || 0);
+  } else if (estado === 'lista') {
+    // Lista: misma fórmula que al marcar la orden lista →
+    // (subtotal - promo) - descuento_fidelidad. La seña y la multa se aplican
+    // dinámicamente en la pantalla de listas y en el retiro, sobre este total.
+    const fid = Number(descuento_fidelidad || 0);
+    if (fid > 0) {
+      total -= Math.floor(total * fid / 100);
+    }
+  }
+
   if (total < 0) total = 0;
 
   await pool.query(
