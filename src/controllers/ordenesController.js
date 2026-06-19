@@ -9,6 +9,39 @@ const { exec } = require("child_process");
 const { obtenerPrecioEnFecha } = require("../helpers/precioHistorico");
 
 // ======================================
+// HELPER: Permisos para editar servicios de una orden
+// ======================================
+// En estos estados, cualquier usuario (admin o empleado) puede agregar/quitar
+// servicios. En cualquier otro estado (p. ej. 'lista', 'retirada', 'entregada')
+// la orden se considera CERRADA y solo un admin puede corregir servicios.
+const ESTADOS_EDITABLES_TODOS = ['abierta', 'ingresado', 'confirmada'];
+
+// Devuelve el rol ('admin' | 'empleado') de un usuario, o null si no existe.
+const obtenerRolUsuario = async (usuarioId) => {
+  if (!usuarioId) return null;
+  const r = await pool.query('SELECT rol FROM usuarios WHERE id = $1', [usuarioId]);
+  return r.rows[0]?.rol || null;
+};
+
+// Decide si se puede editar servicios de una orden segun su estado y el rol.
+// Devuelve { permitido: boolean, motivo?: string }.
+const puedeEditarServicios = async (estadoOrden, usuarioId) => {
+  // Orden abierta/ingresada/confirmada: cualquiera puede editar.
+  if (ESTADOS_EDITABLES_TODOS.includes(estadoOrden)) {
+    return { permitido: true };
+  }
+  // Orden cerrada: solo admin.
+  const rol = await obtenerRolUsuario(usuarioId);
+  if (rol === 'admin') {
+    return { permitido: true };
+  }
+  return {
+    permitido: false,
+    motivo: `La orden está en estado "${estadoOrden}" (cerrada). Solo un administrador puede corregir servicios.`
+  };
+};
+
+// ======================================
 // HELPER: Verificar si la promo 3x2 aplica hoy (Martes a Viernes)
 // ======================================
 // Evalúa el día de INGRESO de la orden, no el día actual.
@@ -228,7 +261,7 @@ const recalcularTotalOrden = async (ordenId) => {
 
 const agregarServicioAOrden = async (req, res) => {
   const { id } = req.params;
-  const { servicio_id, cantidad } = req.body;
+  const { servicio_id, cantidad, usuario_id } = req.body;
 
   if (!servicio_id || !cantidad) {
     return res.status(400).json({
@@ -246,15 +279,22 @@ const agregarServicioAOrden = async (req, res) => {
       return res.status(404).json({ error: 'Servicio no existe' });
     }
 
-    // Traemos la fecha de ingreso de la orden para resolver el precio
-    // que estaba vigente en ese momento (no el precio actual del servicio).
+    // Traemos estado + fecha de ingreso de la orden.
+    // El estado define quién puede editar; la fecha resuelve el precio histórico.
     const ordenInfo = await pool.query(
-      'SELECT fecha_ingreso FROM ordenes WHERE id = $1',
+      'SELECT estado, fecha_ingreso FROM ordenes WHERE id = $1',
       [id]
     );
 
     if (ordenInfo.rows.length === 0) {
       return res.status(404).json({ error: 'Orden no existe' });
+    }
+
+    // Permisos: si la orden está cerrada (no abierta/ingresado/confirmada),
+    // solo un admin puede agregar servicios.
+    const permiso = await puedeEditarServicios(ordenInfo.rows[0].estado, usuario_id);
+    if (!permiso.permitido) {
+      return res.status(403).json({ error: permiso.motivo });
     }
 
     const fechaIngreso = ordenInfo.rows[0].fecha_ingreso;
@@ -1248,8 +1288,30 @@ await generarTicketOrden({
 // DELETE /ordenes/servicios/:id
 const eliminarServicioDeOrden = async (req, res) => {
   const { id } = req.params; // id de orden_servicios
+  // usuario_id puede venir por body o por query (?usuario_id=) segun como lo mande el front
+  const usuario_id = req.body?.usuario_id ?? req.query?.usuario_id;
 
   try {
+    // Buscamos a qué orden pertenece el renglón y en qué estado está,
+    // ANTES de borrar, para validar permisos.
+    const ordenRes = await pool.query(
+      `SELECT o.id AS orden_id, o.estado
+       FROM orden_servicios os
+       JOIN ordenes o ON o.id = os.orden_id
+       WHERE os.id = $1`,
+      [id]
+    );
+
+    if (ordenRes.rows.length === 0) {
+      return res.status(404).json({ error: "Servicio no encontrado" });
+    }
+
+    // Permisos: si la orden está cerrada, solo un admin puede quitar servicios.
+    const permiso = await puedeEditarServicios(ordenRes.rows[0].estado, usuario_id);
+    if (!permiso.permitido) {
+      return res.status(403).json({ error: permiso.motivo });
+    }
+
     const result = await pool.query(
       `DELETE FROM orden_servicios WHERE id = $1 RETURNING *`,
       [id]
