@@ -234,7 +234,7 @@ async function obtenerFotoPexels(query) {
   try {
     const res = await axios.get("https://api.pexels.com/v1/search", {
       headers: { Authorization: process.env.PEXELS_API_KEY },
-      params: { query, per_page: 15, orientation: "square" },
+      params: { query, per_page: 20, locale: "es-ES" },
       timeout: 15000,
     });
     const fotos = res.data?.photos || [];

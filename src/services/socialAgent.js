@@ -42,19 +42,19 @@ Lavaderos Moreno es una lavandería en Moreno, GBA Oeste, Argentina.
 - Público: familias y trabajadores de la zona, gente con poco tiempo.
 `;
 
-// Lista base de búsquedas de imágenes SEGURAS (en inglés, para Pexels).
+// Lista base de búsquedas de imágenes SEGURAS (en español, para Pexels con locale es-ES).
 // Claude debe preferir estas, pero puede variar con términos parecidos y apropiados.
 const BUSQUEDAS_BASE = [
-  "folded laundry",
-  "clean clothes basket",
-  "cozy home winter",
-  "laundry basket clothes",
-  "fresh towels",
-  "rainy window home",
-  "warm blanket bed",
-  "happy family home",
-  "washing machine home",
-  "neatly folded clothes",
+  "ropa doblada",
+  "canasto de ropa limpia",
+  "hogar acogedor invierno",
+  "ropa lavada ordenada",
+  "toallas limpias",
+  "ventana con lluvia hogar",
+  "manta abrigada en la cama",
+  "familia feliz en casa",
+  "lavarropas hogar",
+  "ropa de cama limpia",
 ];
 
 /**
@@ -107,19 +107,19 @@ TENÉS DOS ESTILOS DE PUBLICACIÓN:
 2. "frase"  → una imagen estilo foto + frase emocional/cercana, que conecta con la vida cotidiana (el cansancio, el tiempo libre, el frío, el valor de la ropa). Ideal para novedades, estacionalidad y enganche emocional. NO es una promo directa. Para este estilo se baja una foto real de fondo.
 
 BÚSQUEDA DE FOTO (solo para modo "frase"):
-Si el modo es "frase", incluí en el JSON el campo "busqueda" con términos EN INGLÉS para buscar la foto de fondo.
-REGLA DE ORO: la búsqueda tiene que ser un OBJETO o ESCENA CONCRETA Y FOTOGRAFIABLE, claramente relacionada con el negocio. Ejemplos buenos: "folded laundry stack", "laundry basket full of clothes", "cozy bed with blanket winter", "washing machine laundry room", "fresh clean towels", "family relaxing home sofa", "rainy day window home".
-NO uses conceptos abstractos ni fechas como búsqueda (ej: NO busques "argentina flag day", "independence", "celebration"): eso devuelve fotos sin relación. 
+Si el modo es "frase", incluí en el JSON el campo "busqueda" con términos EN ESPAÑOL para buscar la foto de fondo.
+REGLA DE ORO: la búsqueda tiene que ser un OBJETO o ESCENA CONCRETA Y FOTOGRAFIABLE, claramente relacionada con el negocio. Ejemplos buenos: "ropa doblada", "canasto lleno de ropa", "cama con manta en invierno", "lavarropas", "toallas limpias", "familia relajada en el sofá", "ventana con lluvia".
+NO uses conceptos abstractos como búsqueda (ej: NO busques "independencia", "celebración"): eso devuelve fotos sin relación.
 Si el tema NO tiene una imagen concreta y relacionada que lo represente bien, igual buscá lo más representativo posible (mirá la guía de fechas de abajo).
 GUÍA DE BÚSQUEDA POR FECHA ESPECIAL (usá estos términos concretos cuando aplique):
-- Día de la Bandera / fechas patrias → "argentina flag waving" o "argentina flag"
-- Día del Niño/a → "kids playing happy" o "children playing outdoors"
-- Día del Padre → "father and child happy" o "dad with kids"
-- Día de la Madre → "mother and child home" o "happy mother family"
-- Día del Amigo → "friends laughing together"
-- San Valentín → "couple cozy home"
-- Mundial / partido de Argentina → "soccer ball field" o "people celebrating sports" (sin escudos ni marcas)
-- Invierno → "cozy winter blanket bed" o "rainy window home"
+- Día de la Bandera / fechas patrias → "bandera argentina"
+- Día del Niño/a → "niños jugando felices" o "chicos jugando"
+- Día del Padre → "padre e hijo felices" o "papá con hijos"
+- Día de la Madre → "madre e hijo en casa" o "mamá feliz familia"
+- Día del Amigo → "amigos riendo juntos"
+- San Valentín → "pareja en casa"
+- Mundial / partido de Argentina → "pelota de fútbol cancha" o "festejo deportivo" (sin escudos ni marcas)
+- Invierno → "cama abrigada invierno" o "ventana con lluvia"
 Preferí estos términos base: ${BUSQUEDAS_BASE.join(", ")}.
 
 REGLAS DE DECISIÓN:
@@ -133,7 +133,7 @@ REGLAS DE DECISIÓN:
 
 FECHAS ESPECIALES (¡muy importante!):
 - Si en el contexto aparece una FECHA RELEVANTE (fecha patria, comercial, estación o partido del Mundial) que es hoy o está muy cerca, dale PRIORIDAD y armá el contenido alusivo a esa fecha.
-- Patrias: tono respetuoso y festivo. Para la imagen, usá modo "frase" con una búsqueda CONCRETA y representativa de la fecha (ej: Día de la Bandera → "argentina flag waving"; Día de la Independencia → "argentina flag sky"; fechas patrias en general → "argentina flag"). Un saludo cálido del negocio como frase.
+- Patrias: tono respetuoso y festivo. Para la imagen, usá modo "frase" con una búsqueda CONCRETA y representativa de la fecha (ej: Día de la Bandera → "bandera argentina"; Día de la Independencia → "bandera argentina"; fechas patrias en general → "bandera argentina"). Un saludo cálido del negocio como frase.
 - Comerciales (Día del Padre/Madre/Niño, San Valentín, Amigo): podés ligarlas a una promo o a "regalá tiempo libre, nosotros lavamos".
 - Estaciones (invierno): perfecto para empujar acolchados y camperones.
 - MUNDIAL: cuando Argentina juega (hoy o en 1-2 días), hacé un posteo alentando a la Selección con identidad de marca (ej: relacionar la camiseta argentina, el aguante, con que vos te ocupás de la ropa mientras ellos alientan). Tono festivo, "¡Vamos Argentina!". Nunca uses escudos, logos de FIFA ni marcas registradas; solo aliento genérico.
@@ -151,7 +151,7 @@ RESPONDÉ ÚNICAMENTE CON JSON VÁLIDO, sin markdown, sin explicaciones, con est
   "razon": "breve por qué de la decisión",
   "modo": "placa" | "frase",
   "placa": { "etiqueta": "PROMO", "titular": "...", "bajada": "..." },
-  "frase": { "frase": "...", "bajada": "...", "busqueda": "folded laundry" },
+  "frase": { "frase": "...", "bajada": "...", "busqueda": "ropa doblada" },
   "caption": "texto del post para FB e IG",
   "hashtags": ["#...", "#..."]
 }
