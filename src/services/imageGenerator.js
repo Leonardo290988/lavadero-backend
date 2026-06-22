@@ -240,8 +240,8 @@ async function obtenerFotoPexels(query) {
     const fotos = res.data?.photos || [];
     if (fotos.length === 0) return null;
 
-    // Elegir una al azar entre las primeras 10 para variar
-    const candidatas = fotos.slice(0, 10);
+    // Elegir una al azar entre las primeras 5 (las más relevantes) para variar sin perder pertinencia
+    const candidatas = fotos.slice(0, 5);
     const elegida = candidatas[Math.floor(Math.random() * candidatas.length)];
     const url = elegida.src.large2x || elegida.src.large || elegida.src.original;
 

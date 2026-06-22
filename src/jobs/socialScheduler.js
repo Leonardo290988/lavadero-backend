@@ -1,14 +1,17 @@
 /**
  * ============================================================
- *  SCHEDULER DEL AGENTE SOCIAL
+ *  SCHEDULER DEL AGENTE SOCIAL — con APROBACIÓN
  *  Lavaderos Moreno
  * ============================================================
- *  - Crea la tabla social_posts si no existe
- *  - Corre 2 veces por día (10:00 y 18:00 ARG)
- *  - Le pregunta al agente si publicar, genera la imagen,
- *    publica en FB + IG y registra el resultado.
+ *  Flujo nuevo:
+ *   1. El agente decide y genera la publicación (texto + imagen)
+ *   2. NO publica: la guarda como PENDIENTE
+ *   3. Vos la revisás en el panel web y decidís:
+ *        - Publicar  -> sale en FB e IG
+ *        - Otra imagen -> regenera con la búsqueda que le digas
+ *        - Descartar -> no se publica
  *
- *  Se activa llamando initSocialScheduler() desde server.js
+ *  Tablas: social_posts (historial) y posts_pendientes (cola)
  * ============================================================
  */
 
@@ -18,7 +21,7 @@ const { decidirYGenerar } = require("../services/socialAgent");
 const { generarPlaca, generarFotoFrase, limpiarPlacasViejas } = require("../services/imageGenerator");
 const { publishFacebook, publishInstagram } = require("../services/metaPublisher");
 
-// Crear tabla de historial (mismo patrón que db.js)
+// ---- Crear tablas (patrón de db.js) ----
 pool.query(`
   CREATE TABLE IF NOT EXISTS social_posts (
     id SERIAL PRIMARY KEY,
@@ -30,11 +33,133 @@ pool.query(`
     image_url TEXT,
     publicado_en TIMESTAMP DEFAULT NOW()
   )
-`).catch(err => console.error("❌ Error creando social_posts:", err.message));
+`).catch(err => console.error("Error creando social_posts:", err.message));
 
-/**
- * Registra una publicación en la base.
- */
+pool.query(`
+  CREATE TABLE IF NOT EXISTS posts_pendientes (
+    id SERIAL PRIMARY KEY,
+    modo VARCHAR(20),
+    titular TEXT,
+    caption TEXT,
+    hashtags TEXT,
+    busqueda TEXT,
+    image_url TEXT,
+    decision JSONB,
+    estado VARCHAR(20) DEFAULT 'pendiente',
+    creado_en TIMESTAMP DEFAULT NOW()
+  )
+`).catch(err => console.error("Error creando posts_pendientes:", err.message));
+
+// Generar la imagen según la decisión
+async function generarImagen(decision) {
+  if (decision.modo === "frase" && decision.frase) {
+    return await generarFotoFrase({
+      frase: decision.frase.frase,
+      bajada: decision.frase.bajada,
+      busqueda: decision.frase.busqueda,
+    });
+  }
+  return await generarPlaca({
+    etiqueta: decision.placa?.etiqueta || "PROMO",
+    titular: decision.placa?.titular || "",
+    bajada: decision.placa?.bajada || "",
+  });
+}
+
+// Ciclo: decide, genera y deja PENDIENTE (no publica)
+async function ejecutarCiclo() {
+  console.log("[socialAgent] Evaluando si proponer publicación...");
+  limpiarPlacasViejas();
+
+  const decision = await decidirYGenerar();
+  if (!decision.shouldPost) {
+    console.log("[socialAgent] Decidió NO proponer:", decision.razon);
+    return { propuesto: false, razon: decision.razon };
+  }
+
+  const imagen = await generarImagen(decision);
+  const titular = decision.modo === "frase"
+    ? (decision.frase?.frase || "")
+    : (decision.placa?.titular || "");
+  const busqueda = decision.modo === "frase" ? (decision.frase?.busqueda || "") : "";
+
+  const r = await pool.query(
+    `INSERT INTO posts_pendientes (modo, titular, caption, hashtags, busqueda, image_url, decision, estado)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,'pendiente') RETURNING id`,
+    [
+      decision.modo,
+      titular,
+      decision.caption || "",
+      JSON.stringify(decision.hashtags || []),
+      busqueda,
+      imagen.publicUrl,
+      JSON.stringify(decision),
+    ]
+  );
+
+  console.log(`[socialAgent] Propuesta #${r.rows[0].id} lista para revisar (${decision.modo}).`);
+  return { propuesto: true, id: r.rows[0].id, modo: decision.modo, imagen: imagen.publicUrl, razon: decision.razon };
+}
+
+// Listar / publicar / regenerar / descartar (las usa el panel)
+async function listarPendientes() {
+  const r = await pool.query(
+    `SELECT id, modo, titular, caption, hashtags, busqueda, image_url, creado_en
+     FROM posts_pendientes WHERE estado='pendiente' ORDER BY creado_en DESC`
+  );
+  return r.rows.map(row => ({ ...row, hashtags: safeParse(row.hashtags) }));
+}
+
+async function publicarPendiente(id) {
+  const r = await pool.query(`SELECT * FROM posts_pendientes WHERE id=$1 AND estado='pendiente'`, [id]);
+  if (r.rows.length === 0) throw new Error("No existe esa propuesta pendiente.");
+  const p = r.rows[0];
+  const hashtags = safeParse(p.hashtags) || [];
+  const resultado = { id, publicado: true };
+
+  try {
+    const fb = await publishFacebook(p.image_url, p.caption, hashtags);
+    await registrarPost(p.modo, p.titular, p.caption, "facebook", fb.id || fb.post_id, p.image_url);
+    resultado.facebook = fb.id || fb.post_id;
+  } catch (e) {
+    resultado.facebook_error = e.message;
+  }
+
+  try {
+    const ig = await publishInstagram(p.image_url, p.caption, hashtags);
+    await registrarPost(p.modo, p.titular, p.caption, "instagram", ig.id, p.image_url);
+    resultado.instagram = ig.id;
+  } catch (e) {
+    resultado.instagram_error = e.message;
+  }
+
+  await pool.query(`UPDATE posts_pendientes SET estado='publicado' WHERE id=$1`, [id]);
+  return resultado;
+}
+
+async function regenerarImagen(id, nuevaBusqueda) {
+  const r = await pool.query(`SELECT * FROM posts_pendientes WHERE id=$1 AND estado='pendiente'`, [id]);
+  if (r.rows.length === 0) throw new Error("No existe esa propuesta pendiente.");
+  const p = r.rows[0];
+
+  const frase = p.titular || (p.caption ? p.caption.split("\n")[0] : "Lavaderos Moreno");
+  const decision = safeParse(p.decision) || {};
+  const bajada = decision && decision.frase ? (decision.frase.bajada || "") : "";
+
+  const imagen = await generarFotoFrase({ frase, bajada, busqueda: nuevaBusqueda });
+
+  await pool.query(
+    `UPDATE posts_pendientes SET image_url=$1, busqueda=$2, modo='frase' WHERE id=$3`,
+    [imagen.publicUrl, nuevaBusqueda, id]
+  );
+  return { id, image_url: imagen.publicUrl, busqueda: nuevaBusqueda };
+}
+
+async function descartarPendiente(id) {
+  await pool.query(`UPDATE posts_pendientes SET estado='descartado' WHERE id=$1`, [id]);
+  return { id, descartado: true };
+}
+
 async function registrarPost(modo, titular, caption, plataforma, metaPostId, imageUrl) {
   try {
     await pool.query(
@@ -47,74 +172,13 @@ async function registrarPost(modo, titular, caption, plataforma, metaPostId, ima
   }
 }
 
-/**
- * Ejecuta un ciclo completo: decide, genera, publica, registra.
- * Exportada para poder dispararla manualmente desde una ruta de prueba.
- */
-async function ejecutarCiclo() {
-  console.log("[socialAgent] Evaluando si publicar...");
-  limpiarPlacasViejas();
-
-  const decision = await decidirYGenerar();
-
-  if (!decision.shouldPost) {
-    console.log("[socialAgent] Decidió NO publicar:", decision.razon);
-    return { publicado: false, razon: decision.razon };
-  }
-
-  console.log(`[socialAgent] Publicando (${decision.modo}). Razón:`, decision.razon);
-
-  // 1. Generar la imagen según el modo
-  let imagen, titular;
-  if (decision.modo === "frase" && decision.frase) {
-    imagen = await generarFotoFrase({
-      frase: decision.frase.frase,
-      bajada: decision.frase.bajada,
-      busqueda: decision.frase.busqueda,
-    });
-    titular = decision.frase.frase;
-  } else {
-    // por defecto, placa
-    imagen = await generarPlaca({
-      etiqueta: decision.placa?.etiqueta || "PROMO",
-      titular: decision.placa?.titular || "",
-      bajada: decision.placa?.bajada || "",
-    });
-    titular = decision.placa?.titular || "";
-  }
-
-  const caption = decision.caption || "";
-  const hashtags = decision.hashtags || [];
-  const resultado = { publicado: true, modo: decision.modo, imagen: imagen.publicUrl };
-
-  // 2. Publicar en Facebook
-  try {
-    const fb = await publishFacebook(imagen.publicUrl, caption, hashtags);
-    await registrarPost(decision.modo, titular, caption, "facebook", fb.id || fb.post_id, imagen.publicUrl);
-    resultado.facebook = fb;
-    console.log("[socialAgent] Facebook OK:", fb.id || fb.post_id);
-  } catch (e) {
-    resultado.facebook_error = e.message;
-    console.error("[socialAgent] Error Facebook:", e.message);
-  }
-
-  // 3. Publicar en Instagram
-  try {
-    const ig = await publishInstagram(imagen.publicUrl, caption, hashtags);
-    await registrarPost(decision.modo, titular, caption, "instagram", ig.id, imagen.publicUrl);
-    resultado.instagram = ig;
-    console.log("[socialAgent] Instagram OK:", ig.id);
-  } catch (e) {
-    resultado.instagram_error = e.message;
-    console.error("[socialAgent] Error Instagram:", e.message);
-  }
-
-  return resultado;
+function safeParse(v) {
+  if (!v) return null;
+  if (typeof v === "object") return v;
+  try { return JSON.parse(v); } catch { return null; }
 }
 
-/**
- * Inicia el cron. Corre a las 10:00 y 18:00 (Argentina).
- */
+// Cron: genera propuestas a las 10:00 y 18:00 (Argentina)
 function initSocialScheduler() {
   cron.schedule("0 10,18 * * *", async () => {
     try {
@@ -124,7 +188,14 @@ function initSocialScheduler() {
     }
   }, { timezone: "America/Argentina/Buenos_Aires" });
 
-  console.log("📣 [socialAgent] Scheduler iniciado (10:00 y 18:00 ARG)");
+  console.log("[socialAgent] Scheduler iniciado - genera propuestas a las 10:00 y 18:00 ARG (requieren tu aprobacion)");
 }
 
-module.exports = { initSocialScheduler, ejecutarCiclo };
+module.exports = {
+  initSocialScheduler,
+  ejecutarCiclo,
+  listarPendientes,
+  publicarPendiente,
+  regenerarImagen,
+  descartarPendiente,
+};

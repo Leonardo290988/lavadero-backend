@@ -203,13 +203,17 @@ app.use("/contabilidad", require("./routes/contabilidad"));
 app.use("/club", require("./routes/club"));
 app.use("/whatsapp", require("./routes/whatsapp"));
 app.use("/operador", require("./routes/operador"));
+app.use("/redes", require("./routes/redesPanel"));
 
 // ========================
-// ⚠️ RUTA TEMPORAL DE PRUEBA — BORRAR DESPUÉS DE TESTEAR
-//    Dispara el agente completo: decide, redacta, genera y publica.
+// Generar una propuesta a demanda (para probar sin esperar al cron).
+// Genera y deja PENDIENTE en el panel; NO publica.
 // ========================
-app.get("/test-agente", async (req, res) => {
+app.get("/redes-generar", async (req, res) => {
   try {
+    if (!process.env.PANEL_TOKEN || req.query.token !== process.env.PANEL_TOKEN) {
+      return res.status(401).json({ error: "No autorizado" });
+    }
     const { ejecutarCiclo } = require("./jobs/socialScheduler");
     const resultado = await ejecutarCiclo();
     res.json(resultado);

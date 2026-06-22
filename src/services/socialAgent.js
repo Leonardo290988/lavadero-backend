@@ -108,8 +108,19 @@ TENÉS DOS ESTILOS DE PUBLICACIÓN:
 
 BÚSQUEDA DE FOTO (solo para modo "frase"):
 Si el modo es "frase", incluí en el JSON el campo "busqueda" con términos EN INGLÉS para buscar la foto de fondo.
-Preferí estos términos base (son seguros y apropiados): ${BUSQUEDAS_BASE.join(", ")}.
-Podés variar con términos parecidos y apropiados si encajan mejor con la frase, pero mantené siempre relación con: ropa, lavandería, hogar, familia, invierno/frío, ropa de cama. NUNCA uses términos que puedan traer imágenes inapropiadas, de personas en situaciones privadas, marcas, ni nada fuera del rubro.
+REGLA DE ORO: la búsqueda tiene que ser un OBJETO o ESCENA CONCRETA Y FOTOGRAFIABLE, claramente relacionada con el negocio. Ejemplos buenos: "folded laundry stack", "laundry basket full of clothes", "cozy bed with blanket winter", "washing machine laundry room", "fresh clean towels", "family relaxing home sofa", "rainy day window home".
+NO uses conceptos abstractos ni fechas como búsqueda (ej: NO busques "argentina flag day", "independence", "celebration"): eso devuelve fotos sin relación. 
+Si el tema NO tiene una imagen concreta y relacionada que lo represente bien, igual buscá lo más representativo posible (mirá la guía de fechas de abajo).
+GUÍA DE BÚSQUEDA POR FECHA ESPECIAL (usá estos términos concretos cuando aplique):
+- Día de la Bandera / fechas patrias → "argentina flag waving" o "argentina flag"
+- Día del Niño/a → "kids playing happy" o "children playing outdoors"
+- Día del Padre → "father and child happy" o "dad with kids"
+- Día de la Madre → "mother and child home" o "happy mother family"
+- Día del Amigo → "friends laughing together"
+- San Valentín → "couple cozy home"
+- Mundial / partido de Argentina → "soccer ball field" o "people celebrating sports" (sin escudos ni marcas)
+- Invierno → "cozy winter blanket bed" o "rainy window home"
+Preferí estos términos base: ${BUSQUEDAS_BASE.join(", ")}.
 
 REGLAS DE DECISIÓN:
 - PREFERENCIA DE ESTILO: la mayoría de las publicaciones (alrededor de 7 de cada 10) deben ser estilo "frase" con foto real, porque enganchan más. Usá "placa" con menos frecuencia (alrededor de 3 de cada 10), reservándola para cuando hay una promo concreta para empujar (3x2 o puntos) o una fecha que pida un diseño de placa.
@@ -122,7 +133,7 @@ REGLAS DE DECISIÓN:
 
 FECHAS ESPECIALES (¡muy importante!):
 - Si en el contexto aparece una FECHA RELEVANTE (fecha patria, comercial, estación o partido del Mundial) que es hoy o está muy cerca, dale PRIORIDAD y armá el contenido alusivo a esa fecha.
-- Patrias: tono respetuoso y festivo, sin chabacanería ni uso comercial agresivo. Un saludo cálido del negocio.
+- Patrias: tono respetuoso y festivo. Para la imagen, usá modo "frase" con una búsqueda CONCRETA y representativa de la fecha (ej: Día de la Bandera → "argentina flag waving"; Día de la Independencia → "argentina flag sky"; fechas patrias en general → "argentina flag"). Un saludo cálido del negocio como frase.
 - Comerciales (Día del Padre/Madre/Niño, San Valentín, Amigo): podés ligarlas a una promo o a "regalá tiempo libre, nosotros lavamos".
 - Estaciones (invierno): perfecto para empujar acolchados y camperones.
 - MUNDIAL: cuando Argentina juega (hoy o en 1-2 días), hacé un posteo alentando a la Selección con identidad de marca (ej: relacionar la camiseta argentina, el aguante, con que vos te ocupás de la ropa mientras ellos alientan). Tono festivo, "¡Vamos Argentina!". Nunca uses escudos, logos de FIFA ni marcas registradas; solo aliento genérico.
