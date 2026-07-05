@@ -35,8 +35,10 @@ const PROMOS_FIJAS = [
 // Datos del negocio para que Claude tenga contexto
 const NEGOCIO = `
 Lavaderos Moreno es una lavandería en Moreno, GBA Oeste, Argentina.
-- Servicios: lavado de ropa en general, acolchados, camperones, ropa de cama, zapatillas.
-- Tiene servicio de valet (retiro y entrega a domicilio) y local.
+- SERVICIO DE VALET: es el servicio de LAVADO Y SECADO de ropa (el servicio principal del lavadero). NO significa retiro ni entrega a domicilio. Cuando hables del "valet", referite al lavado y secado profesional de las prendas.
+- Otros servicios: lavado de ropa en general, acolchados, camperones, ropa de cama, zapatillas.
+- Atención en el LOCAL (el cliente lleva y retira su ropa).
+- IMPORTANTE: NO ofrecas retiro ni entrega a domicilio. NUNCA digas cosas como "no te muevas de tu casa", "pedí el retiro a domicilio" ni "te lo llevamos". El cliente se acerca al local.
 - App propia para clientes.
 - Tono de marca: cercano, barrial, cálido, informal pero prolijo. Hablale de "vos".
 - Público: familias y trabajadores de la zona, gente con poco tiempo.
@@ -122,14 +124,24 @@ GUÍA DE BÚSQUEDA POR FECHA ESPECIAL (usá estos términos concretos cuando apl
 - Invierno → "cama abrigada invierno" o "ventana con lluvia"
 Preferí estos términos base: ${BUSQUEDAS_BASE.join(", ")}.
 
+MENÚ DE TIPOS DE CONTENIDO (¡rotá entre estos, no repitas siempre lo mismo!):
+- TIP de lavado: consejos útiles (cómo quitar una mancha, lavar zapatillas, cuidar acolchados, separar colores, etc.). Muy valorado por la gente.
+- HUMOR / relatable: algo con gracia sobre la vida cotidiana y la ropa (el drama de la ropa acumulada, los lunes, el cesto que nunca baja). Tono liviano y simpático.
+- CLIMA / estación: algo ligado al frío, la lluvia, el invierno (ej: "día de lluvia, día de mate y ropa limpia").
+- FRASE emocional: conectar con el tiempo libre, el descanso, el valor de las prendas.
+- PROMO: 3x2 en acolchados/camperones o el sistema de puntos.
+- NOVEDAD / servicio: recordar el servicio de lavado y secado (valet), la app, la calidad.
+- FECHA ESPECIAL: si hay una fecha relevante cerca (ver abajo).
+
 REGLAS DE DECISIÓN:
-- PREFERENCIA DE ESTILO: la mayoría de las publicaciones (alrededor de 7 de cada 10) deben ser estilo "frase" con foto real, porque enganchan más. Usá "placa" con menos frecuencia (alrededor de 3 de cada 10), reservándola para cuando hay una promo concreta para empujar (3x2 o puntos) o una fecha que pida un diseño de placa.
-- Mirá las ÚLTIMAS PUBLICACIONES: si las últimas fueron placas, esta vez hacé "frase"; si venís con varias "frase", podés meter una placa de promo. Buscá que predomine "frase" pero sin abandonar las promos.
-- Martes a viernes: buen momento para recordar la promo 3x2, pero podés hacerlo igual con estilo "frase" (foto + frase que mencione la promo) en vez de placa, para variar.
-- Lunes / fin de semana: "frase" emocional.
-- NO repitas el mismo tema ni el mismo estilo que las últimas 2-3. Buscá variar.
+- VARIEDAD ANTE TODO: rotá entre los tipos de contenido del menú. Mirá las ÚLTIMAS PUBLICACIONES y elegí un tipo DISTINTO a los últimos 3-4. La gente se aburre si ve siempre lo mismo.
+- LA PROMO 3x2 NO ES LA PRIORIDAD DIARIA: usala como MUCHO 1 o 2 veces por semana, no todos los días. Si en las últimas publicaciones ya apareció el 3x2, NO lo repitas: elegí tip, humor, clima, frase o novedad.
+- Preferí bastante el estilo "frase" con foto real (engancha más). Usá "placa" sobre todo para las promos concretas (3x2, puntos) o saludos de fechas.
+- Lunes a viernes: variá libremente entre tip, humor, clima, frase o novedad. NO asumas que de martes a viernes hay que hablar del 3x2.
+- Fines de semana: frase emocional, humor o fecha especial.
+- NO repitas el mismo tema ni el mismo estilo que las últimas 3-4 publicaciones.
 - Si ya publicaste algo muy parecido hace muy poco, respondé shouldPost: false.
-- Estamos en invierno en Argentina (junio-agosto): aprovechá el frío, los acolchados, camperones, la lluvia.
+- Estamos en invierno en Argentina (junio-agosto): podés aprovechar el frío, los acolchados, camperones y la lluvia (pero sin repetirlo siempre).
 
 FECHAS ESPECIALES (¡muy importante!):
 - Si en el contexto aparece una FECHA RELEVANTE (fecha patria, comercial, estación o partido del Mundial) que es hoy o está muy cerca, dale PRIORIDAD y armá el contenido alusivo a esa fecha.
