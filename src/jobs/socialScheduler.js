@@ -67,11 +67,11 @@ async function generarImagen(decision) {
 }
 
 // Ciclo: decide, genera y deja PENDIENTE (no publica)
-async function ejecutarCiclo() {
+async function ejecutarCiclo(sugerencia = "") {
   console.log("[socialAgent] Evaluando si proponer publicación...");
   limpiarPlacasViejas();
 
-  const decision = await decidirYGenerar();
+  const decision = await decidirYGenerar(sugerencia);
   if (!decision.shouldPost) {
     console.log("[socialAgent] Decidió NO proponer:", decision.razon);
     return { propuesto: false, razon: decision.razon };

@@ -93,7 +93,7 @@ async function getContext() {
  * Le pide a Claude que decida y redacte.
  * Devuelve un objeto con la decisión (ver formato abajo).
  */
-async function decidirYGenerar() {
+async function decidirYGenerar(sugerencia = "") {
   const ctx = await getContext();
 
   const systemPrompt = `
@@ -181,7 +181,11 @@ ${ctx.ultimas.length ? ctx.ultimas.map(u => `- [${u.modo}] ${u.titular || u.capt
 
 FECHAS RELEVANTES HOY O PRÓXIMAS:
 ${ctx.fechasRelevantes.length ? ctx.fechasRelevantes.map(f => `- ${f.nombre}${f.detalle ? " (" + f.detalle + ")" : ""} → ${f.esHoy ? "ES HOY" : "en " + f.faltan + " día(s)"} [${f.tipo}]`).join("\n") : "No hay fechas especiales cerca."}
-
+${sugerencia ? `
+⭐ SUGERENCIA DEL DUEÑO (¡prioridad máxima!):
+El dueño te pide específicamente esta publicación: "${sugerencia}"
+Creá la publicación siguiendo esta idea lo más fielmente posible. shouldPost debe ser true (salvo que la idea sea claramente inapropiada o ajena al negocio). Elegí el estilo (placa o frase) que mejor le quede a la idea, y si es "frase", buscá una foto acorde.
+` : ""}
 Decidí si publicar hoy y, si sí, generá el contenido completo.
 `;
 

@@ -20,6 +20,7 @@ const {
   publicarPendiente,
   regenerarImagen,
   descartarPendiente,
+  ejecutarCiclo,
 } = require("../jobs/socialScheduler");
 
 // Middleware simple de token (acepta ?token= o header x-panel-token)
@@ -66,6 +67,17 @@ router.post("/:id/descartar", checkToken, async (req, res) => {
   }
 });
 
+router.post("/sugerir", checkToken, async (req, res) => {
+  try {
+    const sugerencia = (req.body && req.body.sugerencia) || "";
+    if (!sugerencia.trim()) return res.status(400).json({ error: "Escribí una sugerencia." });
+    const resultado = await ejecutarCiclo(sugerencia.trim());
+    res.json(resultado);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Página web del panel (celular)
 router.get("/panel", checkToken, (req, res) => {
   const token = req.query.token;
@@ -102,6 +114,11 @@ const PANEL_HTML = `<!DOCTYPE html>
   .empty { text-align:center; color:#AEBDD0; padding:40px 10px; }
   .msg { text-align:center; padding:10px; font-size:13px; color:#AEBDD0; }
   .spin { opacity:.5; pointer-events:none; }
+  .sugbox { background:#16263F; border:1px solid #24364f; border-radius:14px; padding:14px; margin-bottom:6px; }
+  .sugbox label { display:block; font-size:14px; font-weight:600; margin-bottom:8px; }
+  .sugbox textarea { width:100%; border-radius:9px; border:1px solid #33486a; background:#0E1A2B; color:#fff; font-size:14px; padding:10px; resize:vertical; }
+  .gen { width:100%; margin-top:10px; background:#E23B3B; color:#fff; border:0; border-radius:10px; padding:12px; font-size:14px; font-weight:600; cursor:pointer; }
+  .gen:disabled { opacity:.5; }
 </style>
 </head>
 <body>
@@ -109,11 +126,47 @@ const PANEL_HTML = `<!DOCTYPE html>
   <h1>📣 Publicaciones pendientes</h1>
   <p>Revisá y aprobá lo que el agente preparó.</p>
 </header>
+<div class="wrap">
+  <div class="sugbox">
+    <label>💡 Sugerir una publicación</label>
+    <textarea id="sug" rows="2" placeholder="Ej: hacé un tip para lavar zapatillas / algo del partido del sábado / un chiste sobre la ropa acumulada"></textarea>
+    <button class="gen" onclick="sugerir()">✨ Generar propuesta</button>
+    <div id="sugmsg" class="msg" style="display:none"></div>
+  </div>
+</div>
 <div class="wrap" id="lista"><div class="msg">Cargando…</div></div>
 
 <script>
 const TOKEN = "__TOKEN__";
 const API = "/redes";
+
+async function sugerir(){
+  const ta = document.getElementById("sug");
+  const texto = ta.value.trim();
+  const msg = document.getElementById("sugmsg");
+  if(!texto){ alert("Escribí una sugerencia primero."); return; }
+  const btn = document.querySelector(".gen");
+  btn.disabled = true;
+  msg.style.display = "block";
+  msg.textContent = "Generando propuesta… (puede tardar unos segundos)";
+  try {
+    const r = await fetch(API+"/sugerir?token="+TOKEN,{
+      method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({sugerencia:texto})
+    });
+    const d = await r.json();
+    if(d.propuesto){
+      ta.value = "";
+      msg.textContent = "✅ ¡Propuesta lista! Mirala abajo.";
+      cargar();
+      setTimeout(()=>{ msg.style.display="none"; }, 3000);
+    } else {
+      msg.textContent = "El agente no generó la propuesta: " + (d.razon || d.error || "intentá de nuevo con otra idea.");
+    }
+  } catch(e){
+    msg.textContent = "Error al generar. Probá de nuevo.";
+  }
+  btn.disabled = false;
+}
 
 async function cargar() {
   const cont = document.getElementById("lista");
