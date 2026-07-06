@@ -15,6 +15,7 @@
 const axios = require("axios");
 const pool = require("../db");
 const { getFechasRelevantes } = require("./calendarioFechas");
+const { obtenerClima } = require("./clima");
 
 // ============================================================
 //  PROMOS FIJAS — editá acá cuando cambien tus promociones
@@ -86,6 +87,7 @@ async function getContext() {
     fecha: now.toISOString().slice(0, 10),
     ultimas,
     fechasRelevantes: getFechasRelevantes(now, 2),
+    clima: await obtenerClima(),
   };
 }
 
@@ -142,6 +144,7 @@ REGLAS DE DECISIÓN:
 - NO repitas el mismo tema ni el mismo estilo que las últimas 3-4 publicaciones.
 - Si ya publicaste algo muy parecido hace muy poco, respondé shouldPost: false.
 - Estamos en invierno en Argentina (junio-agosto): podés aprovechar el frío, los acolchados, camperones y la lluvia (pero sin repetirlo siempre).
+- CLIMA: solo mencioná el clima si en el contexto figura como LLAMATIVO (lluvia, frío o calor intensos). Si el clima es normal, NO hables del clima. Cuando sí es llamativo, podés hacer un posteo bien oportuno (ej: lluvia → "día de lluvia, dejanos tu ropa y despreocupate"; frío intenso → acolchados y camperones; calor → ropa de cama liviana).
 
 FECHAS ESPECIALES (¡muy importante!):
 - Si en el contexto aparece una FECHA RELEVANTE (fecha patria, comercial, estación o partido del Mundial) que es hoy o está muy cerca, dale PRIORIDAD y armá el contenido alusivo a esa fecha.
@@ -181,6 +184,8 @@ ${ctx.ultimas.length ? ctx.ultimas.map(u => `- [${u.modo}] ${u.titular || u.capt
 
 FECHAS RELEVANTES HOY O PRÓXIMAS:
 ${ctx.fechasRelevantes.length ? ctx.fechasRelevantes.map(f => `- ${f.nombre}${f.detalle ? " (" + f.detalle + ")" : ""} → ${f.esHoy ? "ES HOY" : "en " + f.faltan + " día(s)"} [${f.tipo}]`).join("\n") : "No hay fechas especiales cerca."}
+
+CLIMA DE HOY EN MORENO: ${ctx.clima.descripcion} ${ctx.clima.llamativo ? "→ ES LLAMATIVO, podés aprovecharlo si encaja." : "→ clima normal, NO menciones el clima."}
 ${sugerencia ? `
 ⭐ SUGERENCIA DEL DUEÑO (¡prioridad máxima!):
 El dueño te pide específicamente esta publicación: "${sugerencia}"
