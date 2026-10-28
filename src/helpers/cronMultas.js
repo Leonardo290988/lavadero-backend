@@ -225,8 +225,8 @@ async function descartarOrdenes() {
 
       // Traer servicios de la orden para snapshot
       const serviciosRes = await client.query(`
-        SELECT s.nombre, os.cantidad, os.precio
-        FROM ordenes_servicios os
+        SELECT s.nombre, os.cantidad, os.precio_unitario
+        FROM orden_servicios os
         LEFT JOIN servicios s ON s.id = os.servicio_id
         WHERE os.orden_id = $1
       `, [orden.id]);

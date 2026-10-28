@@ -26,7 +26,9 @@ const {
   eliminarOrden,
   getOrdenesSinRetirar,
   registrarRecordatorio,
-  actualizarNotas
+  actualizarNotas,
+  actualizarPreciosOrden,
+  descartarOrdenManual
 } = require('../controllers/ordenesController');
 
 router.get("/cliente/:id/listas", getOrdenesListasCliente); // 🆕 ANTES de /cliente/:clienteId
@@ -46,6 +48,8 @@ router.put('/:id/retirar', retirarOrden);
 router.put('/:id/senia', actualizarSenia);
 router.put('/:id/notas', actualizarNotas);
 router.put('/:id/cerrar', cerrarOrden);
+router.put('/:id/actualizar-precios', actualizarPreciosOrden);
+router.post('/:id/descartar', descartarOrdenManual);
 router.post('/:id/servicios', agregarServicioAOrden);
 router.get('/:id/servicios', getServiciosDeOrden);
 router.delete("/servicios/:id", eliminarServicioDeOrden);

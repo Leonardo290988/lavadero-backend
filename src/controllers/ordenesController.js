@@ -6,40 +6,6 @@ const imprimirTicket = require("../utils/imprimirTicket");
 const generarTicketRopa = require("../utils/generarTicketRopa");
 const generarTicketRetiro = require("../utils/generarTicketRetiro");
 const { exec } = require("child_process");
-const { obtenerPrecioEnFecha } = require("../helpers/precioHistorico");
-
-// ======================================
-// HELPER: Permisos para editar servicios de una orden
-// ======================================
-// En estos estados, cualquier usuario (admin o empleado) puede agregar/quitar
-// servicios. En cualquier otro estado (p. ej. 'lista', 'retirada', 'entregada')
-// la orden se considera CERRADA y solo un admin puede corregir servicios.
-const ESTADOS_EDITABLES_TODOS = ['abierta', 'ingresado', 'confirmada'];
-
-// Devuelve el rol ('admin' | 'empleado') de un usuario, o null si no existe.
-const obtenerRolUsuario = async (usuarioId) => {
-  if (!usuarioId) return null;
-  const r = await pool.query('SELECT rol FROM usuarios WHERE id = $1', [usuarioId]);
-  return r.rows[0]?.rol || null;
-};
-
-// Decide si se puede editar servicios de una orden segun su estado y el rol.
-// Devuelve { permitido: boolean, motivo?: string }.
-const puedeEditarServicios = async (estadoOrden, usuarioId) => {
-  // Orden abierta/ingresada/confirmada: cualquiera puede editar.
-  if (ESTADOS_EDITABLES_TODOS.includes(estadoOrden)) {
-    return { permitido: true };
-  }
-  // Orden cerrada: solo admin.
-  const rol = await obtenerRolUsuario(usuarioId);
-  if (rol === 'admin') {
-    return { permitido: true };
-  }
-  return {
-    permitido: false,
-    motivo: `La orden está en estado "${estadoOrden}" (cerrada). Solo un administrador puede corregir servicios.`
-  };
-};
 
 // ======================================
 // HELPER: Verificar si la promo 3x2 aplica hoy (Martes a Viernes)
@@ -110,8 +76,8 @@ const getOrdenes = async (req, res) => {
         o.cliente_id,
         c.nombre AS cliente,
         o.estado,
-        TO_CHAR(o.fecha_ingreso, 'YYYY-MM-DD HH24:MI:SS') AS fecha_ingreso,
-        TO_CHAR(o.fecha_retiro, 'YYYY-MM-DD HH24:MI:SS') AS fecha_retiro,
+        o.fecha_ingreso,
+        o.fecha_retiro,
         o.senia,
         o.total
       FROM ordenes o
@@ -216,19 +182,18 @@ const fechaRetiroFinal = fecha_retiro || null;
 // POST /ordenes/:id/servicios
 // ===============================
 // HELPER: Recalcular y guardar total de la orden
-// Se llama al agregar/eliminar servicios en orden confirmada o lista.
+// Se llama al agregar/eliminar servicios en orden confirmada
 // ===============================
 const recalcularTotalOrden = async (ordenId) => {
   const ordenRes = await pool.query(
-    `SELECT estado, senia, descuento_fidelidad FROM ordenes WHERE id = $1`, [ordenId]
+    `SELECT estado, senia FROM ordenes WHERE id = $1`, [ordenId]
   );
   if (ordenRes.rows.length === 0) return;
 
-  const { estado, senia, descuento_fidelidad } = ordenRes.rows[0];
+  const { estado, senia } = ordenRes.rows[0];
 
-  // Solo recalculamos el total guardado para órdenes confirmadas o listas.
-  // En retirada/entregada el total ya es el monto cobrado: no se toca.
-  if (!['confirmada', 'lista'].includes(estado)) return;
+  // Solo actualizar si la orden está confirmada (ya tiene total guardado)
+  if (estado !== 'confirmada') return;
 
   const itemsRes = await pool.query(`
     SELECT s.nombre AS descripcion, os.cantidad, os.precio_unitario AS precio
@@ -251,21 +216,7 @@ const recalcularTotalOrden = async (ordenId) => {
     fechaIngresoOrden
   );
 
-  let total = subtotal - promoDescuento;
-
-  if (estado === 'confirmada') {
-    // Confirmada: el total guardado ya descuenta la seña.
-    total -= Number(senia || 0);
-  } else if (estado === 'lista') {
-    // Lista: misma fórmula que al marcar la orden lista →
-    // (subtotal - promo) - descuento_fidelidad. La seña y la multa se aplican
-    // dinámicamente en la pantalla de listas y en el retiro, sobre este total.
-    const fid = Number(descuento_fidelidad || 0);
-    if (fid > 0) {
-      total -= Math.floor(total * fid / 100);
-    }
-  }
-
+  let total = subtotal - promoDescuento - Number(senia || 0);
   if (total < 0) total = 0;
 
   await pool.query(
@@ -276,7 +227,7 @@ const recalcularTotalOrden = async (ordenId) => {
 
 const agregarServicioAOrden = async (req, res) => {
   const { id } = req.params;
-  const { servicio_id, cantidad, usuario_id } = req.body;
+  const { servicio_id, cantidad } = req.body;
 
   if (!servicio_id || !cantidad) {
     return res.status(400).json({
@@ -294,35 +245,7 @@ const agregarServicioAOrden = async (req, res) => {
       return res.status(404).json({ error: 'Servicio no existe' });
     }
 
-    // Traemos estado + fecha de ingreso de la orden.
-    // El estado define quién puede editar; la fecha resuelve el precio histórico.
-    const ordenInfo = await pool.query(
-      'SELECT estado, fecha_ingreso FROM ordenes WHERE id = $1',
-      [id]
-    );
-
-    if (ordenInfo.rows.length === 0) {
-      return res.status(404).json({ error: 'Orden no existe' });
-    }
-
-    // Permisos: si la orden está cerrada (no abierta/ingresado/confirmada),
-    // solo un admin puede agregar servicios.
-    const permiso = await puedeEditarServicios(ordenInfo.rows[0].estado, usuario_id);
-    if (!permiso.permitido) {
-      return res.status(403).json({ error: permiso.motivo });
-    }
-
-    const fechaIngreso = ordenInfo.rows[0].fecha_ingreso;
-
-    // Precio histórico vigente a la fecha de ingreso de la orden.
-    // Si la orden ingresó antes de un aumento, toma el precio viejo;
-    // si ingresó después, toma el precio nuevo.
-    let precio = await obtenerPrecioEnFecha(servicio_id, fechaIngreso);
-
-    // Resguardo: si por algún motivo no se pudo resolver, usamos el actual.
-    if (precio == null) {
-      precio = servicio.rows[0].precio;
-    }
+    const precio = servicio.rows[0].precio;
 
     await pool.query(
       `
@@ -1136,14 +1059,11 @@ const getOrdenesRetiradas = async (req, res) => {
         c.nombre AS cliente,
         c.telefono,
         o.total,
-        TO_CHAR(o.fecha_ingreso, 'YYYY-MM-DD HH24:MI:SS') AS fecha_ingreso,
         TO_CHAR(o.fecha_retiro, 'YYYY-MM-DD HH24:MI:SS') AS fecha_retiro,
-        u.nombre AS usuario,
-        ug.nombre AS usuario_genero
+        u.nombre AS usuario
         FROM ordenes o
 JOIN clientes c ON o.cliente_id = c.id
 LEFT JOIN usuarios u ON u.id = o.usuario_retiro_id
-LEFT JOIN usuarios ug ON ug.id = o.usuario_id
 WHERE o.estado = 'retirada'
     `;
 
@@ -1283,11 +1203,10 @@ await generarTicketOrden({
   tiene_envio: orden.tiene_envio
 });
 
-    // Generar ticket de ropa (solo número de orden y nombre + nota si tiene)
+    // Generar ticket de ropa (solo número de orden y nombre)
     await generarTicketRopa({
       id: orden.id,
-      cliente: orden.cliente,
-      notas: orden.notas
+      cliente: orden.cliente
     });
 
     console.log("✅ TICKETS GENERADOS");
@@ -1303,30 +1222,8 @@ await generarTicketOrden({
 // DELETE /ordenes/servicios/:id
 const eliminarServicioDeOrden = async (req, res) => {
   const { id } = req.params; // id de orden_servicios
-  // usuario_id puede venir por body o por query (?usuario_id=) segun como lo mande el front
-  const usuario_id = req.body?.usuario_id ?? req.query?.usuario_id;
 
   try {
-    // Buscamos a qué orden pertenece el renglón y en qué estado está,
-    // ANTES de borrar, para validar permisos.
-    const ordenRes = await pool.query(
-      `SELECT o.id AS orden_id, o.estado
-       FROM orden_servicios os
-       JOIN ordenes o ON o.id = os.orden_id
-       WHERE os.id = $1`,
-      [id]
-    );
-
-    if (ordenRes.rows.length === 0) {
-      return res.status(404).json({ error: "Servicio no encontrado" });
-    }
-
-    // Permisos: si la orden está cerrada, solo un admin puede quitar servicios.
-    const permiso = await puedeEditarServicios(ordenRes.rows[0].estado, usuario_id);
-    if (!permiso.permitido) {
-      return res.status(403).json({ error: permiso.motivo });
-    }
-
     const result = await pool.query(
       `DELETE FROM orden_servicios WHERE id = $1 RETURNING *`,
       [id]
@@ -1429,7 +1326,7 @@ const reimprimirTicketOrden = async (req, res) => {
   try {
     // Traer datos de la orden
     const ordenRes = await pool.query(`
-      SELECT o.id, o.senia, o.total, o.tiene_envio, o.fecha_ingreso, o.notas,
+      SELECT o.id, o.senia, o.total, o.tiene_envio, o.fecha_ingreso,
              c.nombre AS cliente, c.telefono
       FROM ordenes o
       JOIN clientes c ON c.id = o.cliente_id
@@ -1485,8 +1382,7 @@ const reimprimirTicketOrden = async (req, res) => {
 
     await generarTicketRopa({
       id: orden.id,
-      cliente: orden.cliente,
-      notas: orden.notas
+      cliente: orden.cliente
     });
 
     res.json({ ok: true, pdf: `/pdf/ordenes/orden_${id}.pdf` });
@@ -1748,8 +1644,167 @@ const getOrdenesEnCursoCliente = async (req, res) => {
   }
 };
 
+// ════════════════════════════════════════════════════════════════
+//  PUT /ordenes/:id/actualizar-precios
+// ════════════════════════════════════════════════════════════════
+// Pone los servicios de la orden al precio ACTUAL del catálogo y
+// recalcula el total. Pensado para retiros muy tardíos donde se cobra
+// el precio de hoy. La multa por almacenamiento se sigue aplicando
+// sola al momento del retiro según los días que lleva lista.
+const actualizarPreciosOrden = async (req, res) => {
+  const { id } = req.params;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const ordRes = await client.query(
+      `SELECT estado, senia, fecha_ingreso FROM ordenes WHERE id = $1`,
+      [id]
+    );
+    if (ordRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Orden no encontrada' });
+    }
+    const { senia, fecha_ingreso } = ordRes.rows[0];
+
+    // Pasar cada servicio de la orden al precio actual del catálogo
+    await client.query(
+      `UPDATE orden_servicios os
+          SET precio_unitario = s.precio
+         FROM servicios s
+        WHERE os.servicio_id = s.id
+          AND os.orden_id = $1`,
+      [id]
+    );
+
+    // Recalcular subtotal con los precios nuevos
+    const itemsRes = await client.query(
+      `SELECT s.nombre AS descripcion, os.cantidad, os.precio_unitario AS precio
+         FROM orden_servicios os
+         JOIN servicios s ON s.id = os.servicio_id
+        WHERE os.orden_id = $1`,
+      [id]
+    );
+
+    let subtotal = 0;
+    for (const s of itemsRes.rows) {
+      subtotal += Number(s.precio) * Number(s.cantidad);
+    }
+
+    // Respetar la promo 3x2 según el día de ingreso de la orden
+    const promoDescuento = calcularPromo3x2(
+      itemsRes.rows.map(s => ({ descripcion: s.descripcion, precio: s.precio, cantidad: s.cantidad })),
+      fecha_ingreso
+    );
+
+    let total = subtotal - promoDescuento - Number(senia || 0);
+    if (total < 0) total = 0;
+
+    await client.query(`UPDATE ordenes SET total = $1 WHERE id = $2`, [total, id]);
+
+    await client.query('COMMIT');
+
+    res.json({
+      ok: true,
+      mensaje: 'Precios actualizados al valor actual',
+      subtotal,
+      promo_descuento: promoDescuento,
+      senia: Number(senia || 0),
+      total
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ ERROR ACTUALIZAR PRECIOS ORDEN:', error.message);
+    res.status(500).json({ error: 'Error al actualizar precios de la orden' });
+  } finally {
+    client.release();
+  }
+};
+
+// ════════════════════════════════════════════════════════════════
+//  POST /ordenes/:id/descartar
+// ════════════════════════════════════════════════════════════════
+// Descarta manualmente una orden: guarda un snapshot en
+// ordenes_descartadas (auditoría) y marca estado = 'descartada', con
+// lo que desaparece de la lista de "listas para retirar".
+// Sin restricción de días: el local decide cuándo. No envía WhatsApp.
+const descartarOrdenManual = async (req, res) => {
+  const { id } = req.params;
+  const { motivo } = req.body || {};
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const ordRes = await client.query(
+      `SELECT o.id, o.cliente_id, o.estado, o.total, o.senia, o.tiene_envio, o.notas,
+              o.fecha_ingreso, o.fecha_lista,
+              c.nombre AS cliente_nombre, c.telefono AS cliente_telefono,
+              CASE WHEN o.fecha_lista IS NOT NULL
+                   THEN EXTRACT(DAY FROM NOW() - o.fecha_lista)::INT END AS dias
+         FROM ordenes o
+         JOIN clientes c ON c.id = o.cliente_id
+        WHERE o.id = $1`,
+      [id]
+    );
+    if (ordRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Orden no encontrada' });
+    }
+    const orden = ordRes.rows[0];
+
+    if (orden.estado === 'descartada') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'La orden ya estaba descartada' });
+    }
+    if (orden.estado === 'retirada' || orden.estado === 'entregada') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'No se puede descartar una orden ya retirada' });
+    }
+
+    // Snapshot de servicios (tabla correcta: orden_servicios / precio_unitario)
+    const serviciosRes = await client.query(
+      `SELECT s.nombre, os.cantidad, os.precio_unitario
+         FROM orden_servicios os
+         LEFT JOIN servicios s ON s.id = os.servicio_id
+        WHERE os.orden_id = $1`,
+      [id]
+    );
+
+    await client.query(
+      `INSERT INTO ordenes_descartadas
+         (orden_id_original, cliente_id, cliente_nombre, cliente_telefono,
+          fecha_ingreso, fecha_lista, total, senia, tiene_envio, notas,
+          servicios_json, motivo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+      [
+        orden.id, orden.cliente_id, orden.cliente_nombre, orden.cliente_telefono,
+        orden.fecha_ingreso, orden.fecha_lista, orden.total, orden.senia,
+        orden.tiene_envio, orden.notas,
+        JSON.stringify(serviciosRes.rows),
+        motivo || (orden.dias != null
+          ? `Descartada manualmente (${orden.dias} días)`
+          : 'Descartada manualmente')
+      ]
+    );
+
+    await client.query(`UPDATE ordenes SET estado = 'descartada' WHERE id = $1`, [id]);
+
+    await client.query('COMMIT');
+
+    res.json({ ok: true, mensaje: 'Orden descartada', orden_id: orden.id });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ ERROR DESCARTAR ORDEN MANUAL:', error.message);
+    res.status(500).json({ error: 'Error al descartar la orden' });
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   imprimirTicket,
+  actualizarPreciosOrden,
+  descartarOrdenManual,
   getOrdenesRetiradas,
   getServiciosOrden,
   getOrdenes,
