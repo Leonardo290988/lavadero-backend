@@ -1791,6 +1791,33 @@ const descartarOrdenManual = async (req, res) => {
 
     await client.query('COMMIT');
 
+    // Avisar al cliente por WhatsApp, igual que el descarte automático.
+    // No corta el flujo si el bot falla.
+    try {
+      if (orden.cliente_telefono) {
+        const diasTxt = orden.dias != null
+          ? `por no haber sido retirada en los *${orden.dias} días* desde que estuvo lista`
+          : `por no haber sido retirada en el plazo establecido`;
+
+        const mensaje = `🧺 *Lavaderos Moreno*
+
+Hola ${orden.cliente_nombre}
+
+Lamentamos informarte que tu *orden #${orden.id}* fue *descartada* del local ${diasTxt}.
+
+Conforme te avisamos previamente, *ya no es posible reclamar esta orden ni el dinero abonado*.
+
+Si querés volver a contar con nuestros servicios, estamos a tu disposición.
+
+Saludos,
+Lavaderos Moreno`.trim();
+
+        await enviarWhatsApp({ telefono: orden.cliente_telefono, mensaje });
+      }
+    } catch (e) {
+      console.error('⚠️ No se pudo enviar WhatsApp de descarte manual:', e.message);
+    }
+
     res.json({ ok: true, mensaje: 'Orden descartada', orden_id: orden.id });
   } catch (error) {
     await client.query('ROLLBACK');
@@ -1801,10 +1828,27 @@ const descartarOrdenManual = async (req, res) => {
   }
 };
 
+// ════════════════════════════════════════════════════════════════
+//  GET /ordenes/descartadas
+// ════════════════════════════════════════════════════════════════
+// Lista las órdenes descartadas (auditoría), más nuevas primero.
+const getOrdenesDescartadas = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM ordenes_descartadas ORDER BY id DESC`
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ ERROR GET ORDENES DESCARTADAS:', error.message);
+    res.status(500).json({ error: 'Error al obtener órdenes descartadas' });
+  }
+};
+
 module.exports = {
   imprimirTicket,
   actualizarPreciosOrden,
   descartarOrdenManual,
+  getOrdenesDescartadas,
   getOrdenesRetiradas,
   getServiciosOrden,
   getOrdenes,

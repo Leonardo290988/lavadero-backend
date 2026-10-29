@@ -28,7 +28,8 @@ const {
   registrarRecordatorio,
   actualizarNotas,
   actualizarPreciosOrden,
-  descartarOrdenManual
+  descartarOrdenManual,
+  getOrdenesDescartadas
 } = require('../controllers/ordenesController');
 
 router.get("/cliente/:id/listas", getOrdenesListasCliente); // 🆕 ANTES de /cliente/:clienteId
@@ -39,6 +40,7 @@ router.get('/retiradas', getOrdenesRetiradas);
 router.get('/listas', getOrdenesListasParaRetiro); 
 router.get('/retiros-hoy', getRetirosHoy);
 router.get('/sin-retirar', getOrdenesSinRetirar);
+router.get('/descartadas', getOrdenesDescartadas);
 router.get('/', getOrdenes);
 router.post('/', crearOrden);
 router.post("/:id/confirmar", confirmarOrden);
