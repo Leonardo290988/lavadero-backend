@@ -202,10 +202,7 @@ try {
 // ======================================
 // CERRAR CAJA
 // ======================================
-const cerrarCaja = async (req, res) => {
-  const { cajaId } = req.params;
-
-  try {
+const cerrarCajaCore = async (cajaId) => {
 
     const result = await pool.query(`
       SELECT
@@ -341,12 +338,18 @@ await pool.query(`
   WHERE id=$1
 `, [cajaId, efectivoFinal]);
 
-  res.json({
-  ok: true,
-  efectivoFinal,
-  pdf: `/caja/pdf/turno/${nombreArchivo}`
-});
+  return { efectivoFinal, nombreArchivo };
+};
 
+const cerrarCaja = async (req, res) => {
+  const { cajaId } = req.params;
+  try {
+    const { efectivoFinal, nombreArchivo } = await cerrarCajaCore(cajaId);
+    res.json({
+      ok: true,
+      efectivoFinal,
+      pdf: `/caja/pdf/turno/${nombreArchivo}`
+    });
   } catch (error) {
     console.error("ERROR cerrarCaja:", error);
     res.status(500).json({ error: "Error cerrar caja" });
@@ -602,6 +605,7 @@ const imprimirResumenTurno = async (req, res) => {
 
 module.exports = {
   abrirCaja,
+  cerrarCajaCore,
   getCajaActual,
   registrarMovimiento,
   getUltimoCierre,

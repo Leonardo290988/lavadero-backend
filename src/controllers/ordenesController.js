@@ -1060,10 +1060,12 @@ const getOrdenesRetiradas = async (req, res) => {
         c.telefono,
         o.total,
         TO_CHAR(o.fecha_retiro, 'YYYY-MM-DD HH24:MI:SS') AS fecha_retiro,
-        u.nombre AS usuario
+        u.nombre AS usuario,
+        ug.nombre AS usuario_genero
         FROM ordenes o
 JOIN clientes c ON o.cliente_id = c.id
 LEFT JOIN usuarios u ON u.id = o.usuario_retiro_id
+LEFT JOIN usuarios ug ON ug.id = o.usuario_id
 WHERE o.estado = 'retirada'
     `;
 
@@ -1206,7 +1208,8 @@ await generarTicketOrden({
     // Generar ticket de ropa (solo número de orden y nombre)
     await generarTicketRopa({
       id: orden.id,
-      cliente: orden.cliente
+      cliente: orden.cliente,
+      notas: orden.notas
     });
 
     console.log("✅ TICKETS GENERADOS");
@@ -1326,7 +1329,7 @@ const reimprimirTicketOrden = async (req, res) => {
   try {
     // Traer datos de la orden
     const ordenRes = await pool.query(`
-      SELECT o.id, o.senia, o.total, o.tiene_envio, o.fecha_ingreso,
+      SELECT o.id, o.senia, o.total, o.tiene_envio, o.fecha_ingreso, o.notas,
              c.nombre AS cliente, c.telefono
       FROM ordenes o
       JOIN clientes c ON c.id = o.cliente_id
@@ -1382,7 +1385,8 @@ const reimprimirTicketOrden = async (req, res) => {
 
     await generarTicketRopa({
       id: orden.id,
-      cliente: orden.cliente
+      cliente: orden.cliente,
+      notas: orden.notas
     });
 
     res.json({ ok: true, pdf: `/pdf/ordenes/orden_${id}.pdf` });

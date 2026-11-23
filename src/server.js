@@ -8,6 +8,7 @@ const cron = require("node-cron");
 const pool = require("./db");
 const generarTicketPDF = require("./utils/generarTicketPDF");
 const { iniciarCronMultas } = require("./helpers/cronMultas");
+const { iniciarCronCierreCaja } = require("./helpers/cronCierreCaja");
 const { initSocialScheduler } = require("./jobs/socialScheduler");
 
 const app = express();
@@ -155,6 +156,7 @@ cron.schedule("0 19 28-31 * *", async () => {
 //   - 60 días → último aviso por WhatsApp
 //   - 90 días → orden descartada + WhatsApp final
 iniciarCronMultas();
+iniciarCronCierreCaja();
 
 // 📣 AGENTE DE REDES SOCIALES: publica automáticamente a las 10:00 y 18:00 (Argentina)
 initSocialScheduler();
